@@ -6,6 +6,7 @@
   <title>私房菜单</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#e8590c">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -133,6 +134,10 @@
       <div class="persist-row">
         <button class="btn btn-outline btn-small" id="btn-persist">申请持久化存储</button>
         <span class="hint" id="persist-hint"></span>
+      </div>
+      <div class="install-box">
+        <button class="btn btn-primary" id="btn-install" hidden>📲 安装到桌面 / 主屏幕</button>
+        <p class="hint" id="install-hint"></p>
       </div>
       <div class="backup-actions">
         <button class="btn btn-primary" id="btn-export">导出备份</button>

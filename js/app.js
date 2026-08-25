@@ -22,6 +22,9 @@ var state = {
   lastPick: null          // 最近一次抽中的菜品
 };
 
+// 浏览器把「安装提示事件」暂存在这里（见 beforeinstallprompt）
+var installPromptEvent = null;
+
 // ---- 工具函数 ----
 
 // 把用户输入的内容转义，防止拼进 HTML 时出问题（如菜名里带 < > 符号）
@@ -458,6 +461,7 @@ async function renderBackupView() {
     "</b> / 浏览器配额约 <b>" + quotaText +
     "</b>（配额由浏览器按磁盘空间动态分配，通常几百 MB ~ 几 GB）";
   updatePersistHint();
+  renderInstallHint();
 }
 
 // 显示持久化存储状态；已获准则提示用户无需担心数据被清理
@@ -468,6 +472,21 @@ async function updatePersistHint() {
   try { persisted = await navigator.storage.persisted(); } catch (e) { /* 忽略 */ }
   if (persisted) {
     hint.textContent = "✅ 已获准持久化存储：浏览器不会在磁盘紧张时清理你的数据";
+  }
+}
+
+// 按设备类型显示安装指引
+function renderInstallHint() {
+  var hint = document.getElementById("install-hint");
+  var ua = navigator.userAgent;
+  if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) {
+    hint.textContent = "✅ 已安装：当前正以应用模式运行";
+  } else if (/iPhone|iPad|iPod/.test(ua)) {
+    hint.textContent = "iPhone 安装方法：用 Safari 打开本页 → 底部「分享」按钮 → 「添加到主屏幕」";
+  } else if (/Android/i.test(ua)) {
+    hint.textContent = "手机安装方法：浏览器菜单 ⋮ → 「安装应用 / 添加到主屏幕」；或点上方按钮";
+  } else {
+    hint.textContent = "电脑安装方法：地址栏右侧「安装」图标，或浏览器菜单 → 「安装 私房菜单」；或点上方按钮";
   }
 }
 
@@ -754,6 +773,24 @@ function bindAllEvents() {
     hint.textContent = granted
       ? "✅ 已获准：浏览器不会在磁盘紧张时自动清理你的数据"
       : "未获准（浏览器只授予已安装的应用）。把网站「安装」到桌面/主屏幕后会自动获准；即使未获准，数据一般也不会被清理";
+  });
+
+  // ---- 应用安装（PWA）----
+  // Chrome/Edge 在网站满足安装条件时会触发 beforeinstallprompt，
+  // 我们不让它自动弹系统框，改为显示页面上的「安装」按钮
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    installPromptEvent = e;
+    document.getElementById("btn-install").hidden = false;
+  });
+  document.getElementById("btn-install").addEventListener("click", async function () {
+    if (!installPromptEvent) return;
+    installPromptEvent.prompt();               // 弹出系统的安装确认框
+    await installPromptEvent.userChoice;       // 等用户选择
+    installPromptEvent = null;                 // 事件是一次性的
+    this.hidden = true;
+    updatePersistHint();                       // 装好后刷新持久化状态
+    renderInstallHint();
   });
 
   // 注册离线缓存（Service Worker）：让网站可安装成应用 + 断网可用。

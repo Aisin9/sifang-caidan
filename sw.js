@@ -10,13 +10,13 @@
    只有想「立刻清掉所有旧缓存」时才改 CACHE_NAME。
    ============================================ */
 
-var CACHE_NAME = "sifang-caidan-v1";
+var CACHE_NAME = "sifang-caidan-v2";
 var ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./manifest.json",
-  "./icon.svg",
+  "./icon-192.png",
   "./js/store.js",
   "./js/image.js",
   "./js/random.js",
