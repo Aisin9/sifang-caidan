@@ -742,7 +742,7 @@ function bindAllEvents() {
     showView("list");
   });
 
-  // 申请持久化存储：获准后浏览器不会在磁盘紧张时自动清理数据
+  // 申请持久化存储：浏览器只授予「安装到桌面/主屏幕」的应用（PWA）
   document.getElementById("btn-persist").addEventListener("click", async function () {
     var hint = document.getElementById("persist-hint");
     if (!(navigator.storage && navigator.storage.persist)) {
@@ -753,8 +753,23 @@ function bindAllEvents() {
     try { granted = await navigator.storage.persist(); } catch (e) { /* 忽略 */ }
     hint.textContent = granted
       ? "✅ 已获准：浏览器不会在磁盘紧张时自动清理你的数据"
-      : "未获准（浏览器策略限制）。数据一般不会被清理，建议定期导出备份";
+      : "未获准（浏览器只授予已安装的应用）。把网站「安装」到桌面/主屏幕后会自动获准；即使未获准，数据一般也不会被清理";
   });
+
+  // 注册离线缓存（Service Worker）：让网站可安装成应用 + 断网可用。
+  // 仅 https 环境生效（本地 file:// 打开会自动跳过，不影响使用）
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(function (e) {
+      console.warn("离线缓存注册失败（不影响使用）：", e);
+    });
+  }
+
+  // 已安装为桌面/主屏幕应用时，Chrome 会自动授予持久化存储；
+  // 这里对其他浏览器（如 Safari）补一次请求
+  if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches &&
+      navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(function () { /* 忽略 */ });
+  }
 
   // ---- 启动：显示列表页 ----
   showView("list");
