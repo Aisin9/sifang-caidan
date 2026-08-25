@@ -1,0 +1,479 @@
+/* ============================================
+   私房菜单 — 全部样式
+   设计思路：暖色系、圆角卡片，像一本温馨的食谱手账
+   ============================================ */
+
+/* ---- 颜色变量：想换主题色改这里就行 ---- */
+:root {
+  --primary: #e8590c;          /* 主色：温暖的橙色 */
+  --primary-dark: #c94a07;
+  --primary-light: #fff0e6;
+  --heart: #e03131;            /* 爱心红色 */
+  --bg: #fdf6ee;               /* 页面背景：奶油色 */
+  --card-bg: #ffffff;
+  --text: #3d2c1e;
+  --text-light: #8a7463;
+  --border: #ead9c8;
+  --danger: #d63031;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(61, 44, 30, 0.08);
+}
+
+/* ---- 基础重置 ---- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.hidden { display: none !important; }
+
+/* ---- 顶部导航 ---- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.site-title { font-size: 22px; color: var(--primary); }
+
+.site-nav { display: flex; gap: 8px; }
+
+.nav-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--text-light);
+  transition: all 0.2s;
+}
+.nav-btn:hover { background: var(--primary-light); }
+.nav-btn.active { background: var(--primary); color: #fff; }
+
+/* ---- 页面容器 ---- */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px 16px 100px; /* 底部留白，防止 FAB 遮住内容 */
+}
+
+/* ---- 通用按钮 ---- */
+.btn {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); color: #fff; }
+
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover { background: #b32323; color: #fff; }
+
+.btn-outline { background: transparent; border-color: var(--primary); color: var(--primary); }
+.btn-outline:hover { background: var(--primary-light); }
+
+.btn-plain { border: none; background: transparent; color: var(--text-light); padding: 6px 0; }
+.btn-plain:hover { color: var(--primary); border: none; }
+
+.btn-small { padding: 5px 12px; font-size: 14px; }
+.btn-big { width: 100%; padding: 16px; font-size: 20px; margin-top: 20px; }
+
+/* ---- 搜索框 ---- */
+.search-box { margin-bottom: 12px; }
+
+.search-box input {
+  width: 100%;
+  padding: 11px 16px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  font-size: 15px;
+  background: var(--card-bg);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-box input:focus { border-color: var(--primary); }
+
+/* ---- 分类筛选 chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chips-center { justify-content: center; }
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-light);
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ---- 菜品卡片网格 ---- */
+.dish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.dish-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.dish-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(61, 44, 30, 0.14); }
+
+.card-img { aspect-ratio: 4 / 3; background: #f6ecdf; overflow: hidden; }
+.card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.card-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: #d9c4ab;
+}
+
+.card-body { padding: 10px 12px 12px; }
+
+.card-name {
+  font-size: 16px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.card-tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---- 爱心 ---- */
+.hearts { display: inline-flex; gap: 2px; font-size: 18px; }
+.hearts.small { font-size: 14px; }
+
+.heart { color: #e8ddd0; }
+.heart.filled { color: var(--heart); }
+
+.rating-picker .heart { font-size: 30px; cursor: pointer; transition: transform 0.15s; }
+.rating-picker .heart:hover { transform: scale(1.25); }
+
+/* ---- 标签 ---- */
+.tag {
+  display: inline-block;
+  background: #f3eadf;
+  color: var(--text-light);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* ---- 空状态 ---- */
+.empty { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.empty-icon { font-size: 56px; margin-bottom: 12px; }
+
+/* ---- 浮动添加按钮 ---- */
+.fab {
+  position: fixed;
+  right: 24px;
+  bottom: 28px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(232, 89, 12, 0.4);
+  transition: transform 0.2s;
+  z-index: 20;
+}
+.fab:hover { transform: scale(1.1); background: var(--primary-dark); }
+
+/* ---- 详情页 ---- */
+.detail-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.detail-top-actions { display: flex; gap: 8px; }
+
+.detail-img { margin-bottom: 16px; border-radius: var(--radius); overflow: hidden; }
+.detail-img img { width: 100%; max-height: 320px; object-fit: cover; display: block; }
+
+.detail-name { font-size: 26px; margin-bottom: 8px; }
+
+.detail-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+
+.detail-content h3 {
+  margin: 20px 0 8px;
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.ingredient-detail { list-style: none; }
+.ingredient-detail li {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow);
+}
+.ingredient-detail li::before { content: "· "; color: var(--primary); font-weight: bold; }
+
+.steps-detail { padding-left: 24px; }
+.steps-detail li { margin-bottom: 10px; }
+
+/* ---- 表单 ---- */
+#form-title { margin-bottom: 18px; color: var(--primary); }
+
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-weight: bold; margin-bottom: 6px; }
+
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 15px;
+  background: var(--card-bg);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-group input[type="text"]:focus { border-color: var(--primary); }
+.form-group input.error { border-color: var(--danger); }
+
+.required { color: var(--danger); }
+.hint { color: var(--text-light); font-size: 13px; margin-top: 6px; }
+.hint-inline { color: var(--text-light); font-size: 12px; font-weight: normal; }
+
+/* 动态行：输入框 + 添加按钮 */
+.dynamic-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.dynamic-row input { flex: 1; }
+
+/* 食材 / 步骤列表 */
+.item-list { list-style: none; }
+.item-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+.item-list .item-text { flex: 1; word-break: break-all; }
+
+.btn-remove {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.btn-remove:hover { transform: scale(1.2); }
+
+/* 步骤项：拖拽手柄 + 序号 + 上下移按钮 */
+.step-num { color: var(--primary); font-weight: bold; min-width: 22px; }
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-light);
+  user-select: none; /* 拖拽时防止选中文字 */
+  padding: 0 2px;
+}
+.drag-handle:active { cursor: grabbing; }
+
+.step-actions { display: flex; gap: 2px; align-items: center; }
+
+.btn-arrow {
+  border: none;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.btn-arrow:hover:not(:disabled) { background: var(--primary-light); color: var(--primary); }
+.btn-arrow:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* 拖拽中的视觉效果 */
+.step-item.dragging { opacity: 0.4; }
+.step-item.drag-over { border-top: 3px solid var(--primary); }
+
+/* 标签 chips（表单里） */
+.tag-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-tag { background: var(--primary-light); color: var(--primary); padding: 4px 10px; font-size: 14px; }
+.tag-x {
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 4px;
+  padding: 0;
+}
+.tag-x:hover { color: var(--danger); }
+
+/* 图片预览 */
+.image-preview-box { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.image-preview-box img {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.form-actions { display: flex; gap: 12px; margin-top: 28px; }
+.form-actions .btn { min-width: 100px; }
+
+/* ---- 今天吃什么 ---- */
+.pick-mode { display: flex; justify-content: center; gap: 0; margin-bottom: 8px; }
+
+.seg-btn {
+  border: 1px solid var(--primary);
+  background: var(--card-bg);
+  color: var(--primary);
+  padding: 9px 20px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.seg-btn:first-child { border-radius: 20px 0 0 20px; }
+.seg-btn:last-child { border-radius: 0 20px 20px 0; }
+.seg-btn.active { background: var(--primary); color: #fff; }
+
+.pick-hint { text-align: center; margin-bottom: 12px; }
+
+/* 名字轮播框 */
+.roulette {
+  text-align: center;
+  font-size: 32px;
+  font-weight: bold;
+  padding: 30px 20px;
+  margin-top: 24px;
+  min-height: 100px;
+  color: var(--text-light);
+  animation: roulette-pop 0.15s ease;
+}
+.roulette.final {
+  color: var(--primary);
+  animation: result-pop 0.35s ease;
+}
+
+@keyframes roulette-pop {
+  from { transform: scale(1.15); }
+  to { transform: scale(1); }
+}
+@keyframes result-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 抽中结果卡片 */
+.pick-result { margin-top: 16px; }
+.pop-in { animation: result-pop 0.4s ease; }
+
+.result-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  text-align: center;
+}
+.result-card h3 { font-size: 24px; margin: 10px 0 6px; }
+.result-img {
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-width: 100%;
+}
+.result-img img { width: 100%; max-height: 240px; object-fit: cover; display: block; }
+.result-actions { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+
+/* ---- 备份页 ---- */
+.notice {
+  background: #fff4d6;
+  border: 1px solid #f0d48a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.backup-stats {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+  margin-bottom: 18px;
+}
+
+.backup-actions { display: flex; gap: 12px; margin-bottom: 28px; }
+
+.danger-zone {
+  border: 1px solid #f3b9b9;
+  background: #fff5f5;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.danger-zone h3 { color: var(--danger); margin-bottom: 4px; }
+
+/* ---- 手机端适配 ---- */
+@media (max-width: 600px) {
+  .site-header { padding: 10px 12px; }
+  .site-title { font-size: 19px; }
+  .container { padding: 14px 12px 100px; }
+
+  .dish-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+
+  .btn { padding: 9px 14px; font-size: 14px; }
+  .btn-big { font-size: 18px; }
+
+  .fab { right: 16px; bottom: 20px; width: 50px; height: 50px; font-size: 26px; }
+
+  .roulette { font-size: 26px; }
+  .form-actions .btn { flex: 1; }
+}

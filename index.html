@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>私房菜单</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 顶部：网站名 + 主导航 -->
+  <header class="site-header">
+    <h1 class="site-title">🍳 私房菜单</h1>
+    <nav class="site-nav">
+      <button class="nav-btn active" data-view="list">菜单</button>
+      <button class="nav-btn" data-view="pick">今天吃什么</button>
+      <button class="nav-btn" data-view="backup">备份</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- 视图 1：菜单列表 -->
+    <section id="view-list" class="view">
+      <div class="search-box">
+        <input type="search" id="search-input" placeholder="搜索菜名 / 标签 / 食材…">
+      </div>
+      <div id="category-chips" class="chips"></div>
+      <div id="dish-grid" class="dish-grid"></div>
+      <div id="list-empty" class="empty hidden"></div>
+    </section>
+
+    <!-- 视图 2：菜品详情 -->
+    <section id="view-detail" class="view hidden">
+      <div class="detail-top">
+        <button class="btn btn-plain" id="btn-back">← 返回</button>
+        <div class="detail-top-actions">
+          <button class="btn" id="btn-edit">编辑</button>
+          <button class="btn btn-danger" id="btn-delete">删除</button>
+        </div>
+      </div>
+      <div id="detail-content"></div>
+    </section>
+
+    <!-- 视图 3：添加 / 编辑表单 -->
+    <section id="view-form" class="view hidden">
+      <h2 id="form-title">添加菜品</h2>
+      <form id="dish-form" novalidate>
+        <div class="form-group">
+          <label for="f-name">菜名 <span class="required">*</span></label>
+          <input type="text" id="f-name" placeholder="如：红烧肉">
+        </div>
+
+        <div class="form-group">
+          <label>图片</label>
+          <input type="file" id="f-image" accept="image/*" hidden>
+          <div id="image-preview-box" class="image-preview-box hidden">
+            <img id="image-preview" alt="菜品图片预览">
+            <button type="button" class="btn btn-small btn-danger" id="btn-remove-image">移除图片</button>
+          </div>
+          <button type="button" class="btn btn-outline btn-small" id="btn-pick-image">选择图片</button>
+          <p class="hint">图片会自动压缩到约 100~250KB，方便存储</p>
+        </div>
+
+        <div class="form-group">
+          <label for="f-category">分类</label>
+          <input type="text" id="f-category" list="category-options" placeholder="选择已有分类，或输入新分类">
+          <datalist id="category-options"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label>食材清单</label>
+          <div class="dynamic-row">
+            <input type="text" id="f-ingredient" placeholder="如：五花肉 500g（回车快速添加）">
+            <button type="button" class="btn btn-small" id="btn-add-ingredient">添加</button>
+          </div>
+          <ul id="ingredient-list" class="item-list"></ul>
+        </div>
+
+        <div class="form-group">
+          <label>做法步骤 <span class="hint-inline">（拖动手柄可排序，手机上用 ↑↓ 按钮）</span></label>
+          <div class="dynamic-row">
+            <input type="text" id="f-step" placeholder="如：冷水下锅焯水（回车快速添加）">
+            <button type="button" class="btn btn-small" id="btn-add-step">添加</button>
+          </div>
+          <ol id="step-list" class="item-list step-list"></ol>
+        </div>
+
+        <div class="form-group">
+          <label>标签</label>
+          <div class="dynamic-row">
+            <input type="text" id="f-tag" placeholder="如：下饭（回车快速添加）">
+            <button type="button" class="btn btn-small" id="btn-add-tag">添加</button>
+          </div>
+          <div id="tag-list" class="tag-chips"></div>
+        </div>
+
+        <div class="form-group">
+          <label>喜爱度</label>
+          <div id="rating-picker" class="rating-picker"></div>
+          <p class="hint" id="rating-hint">还没评分</p>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="btn-save">保存</button>
+          <button type="button" class="btn" id="btn-cancel">取消</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 视图 4：今天吃什么 -->
+    <section id="view-pick" class="view hidden">
+      <div class="pick-mode">
+        <button class="seg-btn active" data-mode="equal">等概率</button>
+        <button class="seg-btn" data-mode="weighted">按喜爱度加权</button>
+      </div>
+      <p class="hint pick-hint">加权模式：爱心越多越容易被抽中（5 心概率是 1 心的 5 倍）</p>
+      <div id="pick-category-chips" class="chips chips-center"></div>
+      <button class="btn btn-primary btn-big" id="btn-pick">今天吃什么？</button>
+      <p id="pick-empty-hint" class="hint pick-hint hidden"></p>
+      <div id="roulette-box" class="roulette hidden"></div>
+      <div id="pick-result" class="pick-result hidden"></div>
+    </section>
+
+    <!-- 视图 5：备份 -->
+    <section id="view-backup" class="view hidden">
+      <div class="notice">
+        ⚠️ 数据存在<b>当前设备、当前浏览器</b>里。换设备使用请先「导出备份」，再到新设备「导入备份」。
+      </div>
+      <div id="backup-stats" class="backup-stats"></div>
+      <div class="backup-actions">
+        <button class="btn btn-primary" id="btn-export">导出备份</button>
+        <button class="btn btn-outline" id="btn-import">导入备份</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+      <div class="danger-zone">
+        <h3>危险操作</h3>
+        <p class="hint">清空后无法恢复，建议先导出备份。</p>
+        <button class="btn btn-danger" id="btn-clear-all">清空全部数据</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 浮动添加按钮（只在列表页显示） -->
+  <button id="fab" class="fab" title="添加菜品">＋</button>
+
+  <!-- 引入顺序很重要：后面的文件会调用前面的函数 -->
+  <script src="js/store.js"></script>
+  <script src="js/image.js"></script>
+  <script src="js/random.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
