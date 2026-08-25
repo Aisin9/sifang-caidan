@@ -1,95 +1,235 @@
 /* ============================================
-   store.js — 数据层
-   负责：localStorage 的读写 + 菜品的增删改查
-   所有函数都是全局的，供 app.js 调用
+   store.js — 数据层 v2（IndexedDB 存储）
+   ============================================
+   为什么换存储：
+   - 旧版用 localStorage，浏览器给它固定的约 5MB 配额，图片存不了几道菜
+   - IndexedDB 的配额由浏览器按磁盘空间动态分配（Chrome 最高可达
+     磁盘空闲空间的约 60%，通常几百 MB ~ 几 GB），不再受 5MB 限制
+
+   工作方式：
+   - 启动时 initStore() 一次性把数据读进内存（cache）
+   - 之后「读」直接读内存（同步、快）；「写」先改内存、再异步落盘
+   - 旧版 localStorage 里的数据会自动迁移到 IndexedDB
+   - 如果浏览器不支持 IndexedDB，自动退回 localStorage（约 5MB）
+
+   调用约定：所有写操作（addDish 等）都返回 Promise<boolean>
+   —— true 表示已成功写入磁盘，false 表示存储失败（会弹提示）
    ============================================ */
 
-var STORAGE_KEY = "privateMenuData";
+var DB_NAME = "privateMenuDB";      // IndexedDB 数据库名
+var DB_VERSION = 1;
+var STORE_NAME = "data";            // 对象仓库名
+var MAIN_KEY = "main";              // 整份数据就用这一个 key
+var LEGACY_KEY = "privateMenuData"; // 旧版 localStorage 的键名（迁移用）
 
-// 默认数据结构（第一次使用时初始化）
+var cache = null;  // 内存中的数据（initStore 完成后才有值）
+var useIDB = false; // 当前用的是 IndexedDB 还是 localStorage
+
+// ---- 默认数据结构（第一次使用时初始化）----
 function defaultData() {
   return {
-    version: 1,
+    version: 2,
     categories: ["荤菜", "素菜", "汤羹", "主食", "快手菜"],
     dishes: []
   };
 }
 
-// 从 localStorage 读取全部数据；数据损坏时回退到空数据
-function loadData() {
-  try {
-    var raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultData();
-    var data = JSON.parse(raw);
-    if (!data || !Array.isArray(data.dishes)) return defaultData();
-    if (!Array.isArray(data.categories) || data.categories.length === 0) {
-      data.categories = defaultData().categories;
+// ============================================
+// IndexedDB 基础封装
+// 原生 API 是回调风格、写起来啰嗦，这里包成 Promise
+// ============================================
+
+function openDB() {
+  return new Promise(function (resolve, reject) {
+    var req = indexedDB.open(DB_NAME, DB_VERSION);
+    // 数据库首次创建时建仓库
+    req.onupgradeneeded = function () {
+      if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+        req.result.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = function () { resolve(req.result); };
+    req.onerror = function () { reject(req.error); };
+  });
+}
+
+function idbGet(key) {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      var req = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(key);
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  });
+}
+
+function idbSet(key, value) {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      var req = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(value, key);
+      req.onsuccess = function () { resolve(); };
+      req.onerror = function () { reject(req.error); };
+    });
+  });
+}
+
+function idbDelete(key) {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve, reject) {
+      var req = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).delete(key);
+      req.onsuccess = function () { resolve(); };
+      req.onerror = function () { reject(req.error); };
+    });
+  });
+}
+
+// ============================================
+// 初始化：选引擎 → 读数据 → 旧版迁移
+// ============================================
+
+function initStore() {
+  return (async function () {
+    // 1. 探测 IndexedDB 是否可用（个别浏览器在 file:// 下会禁用）
+    useIDB = false;
+    if (typeof indexedDB !== "undefined") {
+      try {
+        await idbGet(MAIN_KEY);
+        useIDB = true;
+      } catch (e) {
+        useIDB = false;
+      }
     }
-    return data;
-  } catch (e) {
-    alert("本地数据读取失败，已重置为空数据。");
-    return defaultData();
-  }
+
+    // 2. 读取数据
+    var data = null;
+    if (useIDB) {
+      data = await idbGet(MAIN_KEY);
+    } else {
+      data = lsRead(LEGACY_KEY);
+    }
+    if (!data || !Array.isArray(data.dishes)) data = defaultData();
+    cache = data;
+
+    // 3. 旧版迁移：localStorage 里有数据 → 搬进 IndexedDB → 腾出旧的 5MB
+    if (useIDB) {
+      var legacyRaw = localStorage.getItem(LEGACY_KEY);
+      if (legacyRaw) {
+        var existing = await idbGet(MAIN_KEY);
+        if (!existing) {
+          var old = null;
+          try { old = JSON.parse(legacyRaw); } catch (e) { old = null; }
+          if (old && Array.isArray(old.dishes)) {
+            cache = old;
+            await idbSet(MAIN_KEY, old);
+          }
+        }
+        localStorage.removeItem(LEGACY_KEY);
+      }
+    }
+  })();
 }
 
-// 保存全部数据。
-// 成功返回 true；存储空间不足时弹出友好提示并返回 false（表单内容不会丢）
-function saveData(data) {
+// ---- localStorage 引擎的读写（回退方案用）----
+function lsRead(key) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    return true;
+    var raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
-    alert(
-      "本地存储空间不足（浏览器上限约 5MB，图片占大头）。\n" +
-      "建议：删除部分菜品图片，或先到「备份」页导出数据。\n" +
-      "本次修改尚未保存，当前表单内容不会丢失。"
-    );
-    return false;
+    return null;
   }
 }
 
-// 生成唯一 ID：时间戳转 36 进制 + 随机串，冲突概率可忽略
+// ============================================
+// 保存：把内存 cache 写入存储引擎
+// 成功返回 true；空间不足时弹提示并返回 false
+// ============================================
+
+function isQuotaError(e) {
+  return !!(e && (e.name === "QuotaExceededError" || /quota/i.test(String(e.message))));
+}
+
+function storageFullAlert() {
+  alert(
+    "浏览器存储空间不足。\n" +
+    "建议：删除部分菜品图片，或先到「备份」页导出数据。\n" +
+    "本次修改尚未保存，当前表单内容不会丢失。"
+  );
+}
+
+function saveData() {
+  if (useIDB) {
+    return idbSet(MAIN_KEY, cache).then(function () {
+      return true;
+    }).catch(function (e) {
+      if (isQuotaError(e)) storageFullAlert();
+      else alert("保存失败：" + e);
+      return false;
+    });
+  }
+  try {
+    localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
+    return Promise.resolve(true);
+  } catch (e) {
+    storageFullAlert();
+    return Promise.resolve(false);
+  }
+}
+
+// 唯一 ID：时间戳转 36 进制 + 随机串，冲突概率可忽略
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-// ---- 菜品增删改查 ----
+// ============================================
+// 菜品增删改查（读 = 同步读内存；写 = 改内存后异步落盘）
+// ============================================
+
+function getData() {
+  return cache || defaultData();
+}
 
 function getDishes() {
-  return loadData().dishes;
+  return getData().dishes;
 }
 
 function getDish(id) {
-  return loadData().dishes.find(function (d) { return d.id === id; }) || null;
+  return getData().dishes.find(function (d) { return d.id === id; }) || null;
 }
 
-// 新增菜品：自动补 id 和时间戳，返回是否保存成功
+function getCategories() {
+  return getData().categories;
+}
+
+// 整体替换数据（导入备份的「覆盖」模式用）
+function setData(data) {
+  cache = data;
+}
+
+// 新增菜品：自动补 id 和时间戳
 function addDish(dish) {
-  var data = loadData();
   dish.id = uid();
   dish.createdAt = Date.now();
   dish.updatedAt = dish.createdAt;
   fillDishDefaults(dish);
-  data.dishes.push(dish);
-  if (dish.category) addCategoryToData(data, dish.category);
-  return saveData(data);
+  getData().dishes.push(dish);
+  if (dish.category) addCategoryToData(cache, dish.category);
+  return saveData();
 }
 
-// 更新菜品：合并字段，刷新 updatedAt，返回是否保存成功
+// 更新菜品：合并字段，刷新 updatedAt
 function updateDish(id, patch) {
-  var data = loadData();
-  var dish = data.dishes.find(function (d) { return d.id === id; });
-  if (!dish) return false;
+  var dish = getDish(id);
+  if (!dish) return Promise.resolve(false);
   Object.assign(dish, patch);
   dish.updatedAt = Date.now();
-  if (dish.category) addCategoryToData(data, dish.category);
-  return saveData(data);
+  if (dish.category) addCategoryToData(cache, dish.category);
+  return saveData();
 }
 
 function deleteDish(id) {
-  var data = loadData();
+  var data = getData();
   data.dishes = data.dishes.filter(function (d) { return d.id !== id; });
-  return saveData(data);
+  return saveData();
 }
 
 // 防止漏存字段：给缺失的字段补默认值
@@ -101,12 +241,6 @@ function fillDishDefaults(dish) {
   dish.image = dish.image || "";
 }
 
-// ---- 分类 ----
-
-function getCategories() {
-  return loadData().categories;
-}
-
 // 把新分类加进 data（自动去重）
 function addCategoryToData(data, name) {
   name = String(name).trim();
@@ -115,13 +249,42 @@ function addCategoryToData(data, name) {
   }
 }
 
-// 当前数据占用多少 KB（备份页显示用量）
-function getUsageKB() {
-  var raw = localStorage.getItem(STORAGE_KEY) || "";
-  return Math.round(raw.length / 1024);
-}
-
 // 清空全部数据
 function clearAllData() {
-  localStorage.removeItem(STORAGE_KEY);
+  cache = defaultData();
+  if (useIDB) return idbDelete(MAIN_KEY);
+  localStorage.removeItem(LEGACY_KEY);
+  return Promise.resolve(true);
+}
+
+// ============================================
+// 存储统计（备份页显示）
+// ============================================
+
+// 用浏览器标准的 Storage API 拿真实配额和用量
+// 返回 { usageKB, quotaKB, supported }；不支持的浏览器 supported = false
+async function getStorageStats() {
+  if (navigator.storage && navigator.storage.estimate) {
+    try {
+      var est = await navigator.storage.estimate();
+      return {
+        usageKB: Math.round(est.usage / 1024),
+        quotaKB: Math.round(est.quota / 1024),
+        supported: true
+      };
+    } catch (e) { /* 拿不到就走兜底 */ }
+  }
+  // 兜底：按引擎粗略估算
+  if (useIDB) {
+    return { usageKB: Math.round(JSON.stringify(cache).length / 1024), quotaKB: 0, supported: false };
+  }
+  var raw = localStorage.getItem(LEGACY_KEY) || "";
+  return { usageKB: Math.round(raw.length / 1024), quotaKB: 5120, supported: true };
+}
+
+// KB 数字转成好读的单位
+function formatSize(kb) {
+  if (kb >= 1024 * 1024) return (kb / 1024 / 1024).toFixed(2) + " GB";
+  if (kb >= 1024) return (kb / 1024).toFixed(1) + " MB";
+  return kb + " KB";
 }

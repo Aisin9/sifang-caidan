@@ -1,16 +1,17 @@
 /* ============================================
    image.js — 图片压缩
    思路四步：读文件 → 加载图片 → canvas 缩小重绘 → 导出 base64
-   这样 2MB 的手机照片可以压到约 100~250KB，localStorage 才装得下
+   这样 2MB 的手机照片可以压到约 200~500KB
+   （v2 起存储引擎换成 IndexedDB，配额大了，压缩可以放宽些）
    ============================================ */
 
 // file: 用户选择的图片文件
-// maxSide: 最长边像素（默认 800）
-// quality: JPEG 质量 0~1（默认 0.8）
+// maxSide: 最长边像素（默认 1000）
+// quality: JPEG 质量 0~1（默认 0.85）
 // 返回 Promise，成功时得到 "data:image/jpeg;base64,..." 字符串
 function compressImage(file, maxSide, quality) {
-  maxSide = maxSide || 800;
-  quality = quality || 0.8;
+  maxSide = maxSide || 1000;
+  quality = quality || 0.85;
 
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();

@@ -326,7 +326,7 @@ function renderRatingPicker() {
 
 // ---- 保存表单 ----
 
-function saveForm(e) {
+async function saveForm(e) {
   e.preventDefault();
 
   var name = document.getElementById("f-name").value.trim();
@@ -348,9 +348,9 @@ function saveForm(e) {
 
   var ok;
   if (state.editingId) {
-    ok = updateDish(state.editingId, dish);
+    ok = await updateDish(state.editingId, dish);
   } else {
-    ok = addDish(dish);
+    ok = await addDish(dish);
   }
   // 保存失败（如空间不足）时留在表单页，内容不丢
   if (!ok) return;
@@ -449,15 +449,30 @@ function renderPickResult() {
 // 视图 5：备份
 // ============================================
 
-function renderBackupView() {
+async function renderBackupView() {
   var n = getDishes().length;
+  var s = await getStorageStats();
+  var quotaText = s.supported ? formatSize(s.quotaKB) : "未知";
   document.getElementById("backup-stats").innerHTML =
-    "已存 <b>" + n + "</b> 道菜品 · 已用约 <b>" + getUsageKB() +
-    "</b> KB / 浏览器上限约 5MB（约可存 20~30 道带图菜品）";
+    "已存 <b>" + n + "</b> 道菜品 · 存储已用约 <b>" + formatSize(s.usageKB) +
+    "</b> / 浏览器配额约 <b>" + quotaText +
+    "</b>（配额由浏览器按磁盘空间动态分配，通常几百 MB ~ 几 GB）";
+  updatePersistHint();
+}
+
+// 显示持久化存储状态；已获准则提示用户无需担心数据被清理
+async function updatePersistHint() {
+  var hint = document.getElementById("persist-hint");
+  if (!(navigator.storage && navigator.storage.persisted)) return;
+  var persisted = false;
+  try { persisted = await navigator.storage.persisted(); } catch (e) { /* 忽略 */ }
+  if (persisted) {
+    hint.textContent = "✅ 已获准持久化存储：浏览器不会在磁盘紧张时清理你的数据";
+  }
 }
 
 function exportData() {
-  var blob = new Blob([JSON.stringify(loadData(), null, 2)], { type: "application/json" });
+  var blob = new Blob([JSON.stringify(getData(), null, 2)], { type: "application/json" });
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   var now = new Date();
@@ -472,7 +487,7 @@ function exportData() {
 
 function handleImportFile(file) {
   var reader = new FileReader();
-  reader.onload = function () {
+  reader.onload = async function () {
     // 校验 1：必须是合法 JSON
     var data;
     try {
@@ -497,8 +512,9 @@ function handleImportFile(file) {
 
     // 确定 = 合并（按 id 跳过重复）；取消 = 覆盖当前全部数据
     var merge = confirm("点「确定」= 合并进现有菜单（重复的菜会跳过）\n点「取消」= 用备份覆盖当前全部数据");
+    var ok = true;
     if (merge) {
-      var cur = loadData();
+      var cur = getData();
       var ids = new Set(cur.dishes.map(function (d) { return d.id; }));
       var skipped = 0;
       data.dishes.forEach(function (d) {
@@ -511,17 +527,19 @@ function handleImportFile(file) {
       (data.categories || []).forEach(function (c) {
         addCategoryToData(cur, c);
       });
-      if (saveData(cur)) {
+      ok = await saveData();
+      if (ok) {
         alert("导入完成：新增 " + (data.dishes.length - skipped) + " 道菜品" + (skipped ? "，跳过 " + skipped + " 道重复" : ""));
       }
     } else {
       if (confirm("确定用备份覆盖当前全部数据吗？当前数据将丢失（此操作不可恢复）")) {
-        var merged = {
+        setData({
           version: data.version || 1,
           categories: (data.categories && data.categories.length) ? data.categories : defaultData().categories,
           dishes: data.dishes
-        };
-        if (saveData(merged)) alert("导入完成：已恢复为备份内容");
+        });
+        ok = await saveData();
+        if (ok) alert("导入完成：已恢复为备份内容");
       }
     }
     showView("list");
@@ -534,6 +552,14 @@ function handleImportFile(file) {
 // ============================================
 
 function init() {
+  // 先初始化数据层（读 IndexedDB + 旧版迁移），完成后再绑定界面事件
+  initStore().then(bindAllEvents).catch(function (e) {
+    console.error(e);
+    alert("数据初始化失败，请刷新页面重试");
+  });
+}
+
+function bindAllEvents() {
   // ---- 顶部导航 ----
   document.querySelectorAll(".nav-btn").forEach(function (btn) {
     btn.addEventListener("click", function () { showView(btn.dataset.view); });
@@ -560,11 +586,11 @@ function init() {
   // ---- 详情页 ----
   document.getElementById("btn-back").addEventListener("click", function () { showView("list"); });
   document.getElementById("btn-edit").addEventListener("click", function () { openForm(state.currentId); });
-  document.getElementById("btn-delete").addEventListener("click", function () {
+  document.getElementById("btn-delete").addEventListener("click", async function () {
     var d = getDish(state.currentId);
     if (!d) return;
     if (confirm("确定删除「" + d.name + "」吗？删除后无法恢复")) {
-      deleteDish(d.id);
+      await deleteDish(d.id);
       showView("list");
     }
   });
@@ -709,11 +735,25 @@ function init() {
     if (file) handleImportFile(file);
     importFileInput.value = "";
   });
-  document.getElementById("btn-clear-all").addEventListener("click", function () {
+  document.getElementById("btn-clear-all").addEventListener("click", async function () {
     if (!confirm("确定清空全部数据吗？")) return;
     if (!confirm("再次确认：所有菜品将永久删除（建议先导出备份）！")) return;
-    clearAllData();
+    await clearAllData();
     showView("list");
+  });
+
+  // 申请持久化存储：获准后浏览器不会在磁盘紧张时自动清理数据
+  document.getElementById("btn-persist").addEventListener("click", async function () {
+    var hint = document.getElementById("persist-hint");
+    if (!(navigator.storage && navigator.storage.persist)) {
+      hint.textContent = "当前浏览器不支持持久化存储";
+      return;
+    }
+    var granted = false;
+    try { granted = await navigator.storage.persist(); } catch (e) { /* 忽略 */ }
+    hint.textContent = granted
+      ? "✅ 已获准：浏览器不会在磁盘紧张时自动清理你的数据"
+      : "未获准（浏览器策略限制）。数据一般不会被清理，建议定期导出备份";
   });
 
   // ---- 启动：显示列表页 ----
