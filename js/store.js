@@ -111,19 +111,24 @@ function initStore() {
     cache = data;
 
     // 3. 旧版迁移：localStorage 里有数据 → 搬进 IndexedDB → 腾出旧的 5MB
+    // （个别浏览器禁用存储时 localStorage 访问会抛异常，包一层防止初始化崩溃）
     if (useIDB) {
-      var legacyRaw = localStorage.getItem(LEGACY_KEY);
-      if (legacyRaw) {
-        var existing = await idbGet(MAIN_KEY);
-        if (!existing) {
-          var old = null;
-          try { old = JSON.parse(legacyRaw); } catch (e) { old = null; }
-          if (old && Array.isArray(old.dishes)) {
-            cache = old;
-            await idbSet(MAIN_KEY, old);
+      try {
+        var legacyRaw = localStorage.getItem(LEGACY_KEY);
+        if (legacyRaw) {
+          var existing = await idbGet(MAIN_KEY);
+          if (!existing) {
+            var old = null;
+            try { old = JSON.parse(legacyRaw); } catch (e) { old = null; }
+            if (old && Array.isArray(old.dishes)) {
+              cache = old;
+              await idbSet(MAIN_KEY, old);
+            }
           }
+          localStorage.removeItem(LEGACY_KEY);
         }
-        localStorage.removeItem(LEGACY_KEY);
+      } catch (e) {
+        console.warn("localStorage 不可用，跳过迁移：", e);
       }
     }
 
@@ -144,7 +149,13 @@ function initStore() {
       cache.sampleDishesVersion = SAMPLE_DISHES_VERSION;
       // 标记与菜品在同一次写入中落盘，不会出现「只写了一半」的状态
       if (useIDB) await idbSet(MAIN_KEY, cache);
-      else localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
+      else {
+        try {
+          localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
+        } catch (e) {
+          console.warn("localStorage 不可用，示例菜仅保存在本次会话内存中：", e);
+        }
+      }
     }
   })();
 }

@@ -25,6 +25,19 @@ var state = {
 // 浏览器把「安装提示事件」暂存在这里（见 beforeinstallprompt）
 var installPromptEvent = null;
 
+// ---- 版本一致性保护 ----
+// 如果 HTML 和 JS 不是同一版本（旧缓存混入了新文件），核心元素会缺失。
+// 检测到后自动刷新一次；刷新后仍不一致则交给 init() 给出提示。
+(function () {
+  if (document.getElementById("view-home") && document.getElementById("quick-pick-card")) return;
+  try {
+    if (!sessionStorage.getItem("sfc-reload-once")) {
+      sessionStorage.setItem("sfc-reload-once", "1");
+      location.reload();
+    }
+  } catch (e) { /* 存储被禁时跳过，由 init() 提示 */ }
+})();
+
 // ---- 工具函数 ----
 
 // 把用户输入的内容转义，防止拼进 HTML 时出问题（如菜名里带 < > 符号）
@@ -702,10 +715,23 @@ function handleImportFile(file) {
 // ============================================
 
 function init() {
+  // 版本检查：核心元素缺失说明 HTML/JS 版本不一致（自动刷新也没救回来）
+  if (!document.getElementById("view-home") || !document.getElementById("quick-pick-card")) {
+    alert("页面缓存版本不一致。\n请再刷新一两次；若仍不行，请清除该网站的浏览器缓存数据后重试。");
+    return;
+  }
+
   // 先初始化数据层（读 IndexedDB + 旧版迁移），完成后再绑定界面事件
-  initStore().then(bindAllEvents).catch(function (e) {
-    console.error(e);
-    alert("数据初始化失败，请刷新页面重试");
+  initStore().then(function () {
+    try {
+      bindAllEvents();
+    } catch (e) {
+      console.error("界面初始化失败：", e);
+      alert("页面初始化失败，请刷新页面重试。\n若多次刷新仍失败，请按 F12 打开控制台，把红色报错告诉我。");
+    }
+  }).catch(function (e) {
+    console.error("数据层初始化失败：", e);
+    alert("数据初始化失败，请刷新页面重试。\n若多次刷新仍失败，请按 F12 打开控制台，把红色报错告诉我。");
   });
 }
 
