@@ -126,6 +126,26 @@ function initStore() {
         localStorage.removeItem(LEGACY_KEY);
       }
     }
+
+    // 4. 示例菜品：无条件一次性注入（有标记则跳过；用户删除/清空后不复活）
+    if (typeof SAMPLE_DISHES !== "undefined" &&
+        cache.sampleDishesVersion !== SAMPLE_DISHES_VERSION) {
+      SAMPLE_DISHES.forEach(function (s) {
+        var d = Object.assign({}, s);
+        d.id = uid();
+        d.createdAt = Date.now();
+        d.updatedAt = d.createdAt;
+        d.image = (typeof makePlaceholderImage === "function")
+          ? makePlaceholderImage(d.emoji, d.colors, d.name) : "";
+        fillDishDefaults(d);
+        cache.dishes.push(d);
+        if (d.category) addCategoryToData(cache, d.category);
+      });
+      cache.sampleDishesVersion = SAMPLE_DISHES_VERSION;
+      // 标记与菜品在同一次写入中落盘，不会出现「只写了一半」的状态
+      if (useIDB) await idbSet(MAIN_KEY, cache);
+      else localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
+    }
   })();
 }
 
@@ -250,10 +270,15 @@ function addCategoryToData(data, name) {
 }
 
 // 清空全部数据
+// 注意：不是简单删存储，而是写入「空数据 + 示例注入标记」，
+// 这样重载后不会因为标记丢失而把示例菜重新注入
 function clearAllData() {
   cache = defaultData();
-  if (useIDB) return idbDelete(MAIN_KEY);
-  localStorage.removeItem(LEGACY_KEY);
+  if (typeof SAMPLE_DISHES_VERSION !== "undefined") {
+    cache.sampleDishesVersion = SAMPLE_DISHES_VERSION;
+  }
+  if (useIDB) return idbSet(MAIN_KEY, cache);
+  localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
   return Promise.resolve(true);
 }
 

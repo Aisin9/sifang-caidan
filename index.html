@@ -5,26 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>私房菜单</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#e8590c">
+  <meta name="theme-color" content="#6b9080">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- 顶部：网站名 + 主导航 -->
-  <header class="site-header">
-    <h1 class="site-title">🍳 私房菜单</h1>
-    <nav class="site-nav">
-      <button class="nav-btn active" data-view="list">菜单</button>
-      <button class="nav-btn" data-view="pick">今天吃什么</button>
-      <button class="nav-btn" data-view="backup">备份</button>
+<div class="app">
+
+  <!-- 桌面侧栏（手机端由 CSS 隐藏） -->
+  <aside class="sidebar">
+    <a class="brand" data-view="home" href="#">
+      <span class="brand-ico">🍃</span>
+      <span class="brand-name">私房菜单</span>
+    </a>
+    <nav class="side-nav">
+      <button class="nav-item active" data-view="home"><span class="nav-ico">🏠</span><span class="nav-label">首页</span></button>
+      <button class="nav-item" data-view="list"><span class="nav-ico">📖</span><span class="nav-label">菜单</span></button>
+      <button class="nav-item" data-view="pick"><span class="nav-ico">🎲</span><span class="nav-label">抽签</span></button>
+      <button class="nav-item" data-view="me"><span class="nav-ico">⚙️</span><span class="nav-label">我的</span></button>
     </nav>
-  </header>
+  </aside>
 
   <main class="container">
 
+    <!-- 视图 0：首页 -->
+    <section id="view-home" class="view">
+      <h2 id="home-greeting" class="home-greeting"></h2>
+
+      <button type="button" class="quick-pick-card" id="quick-pick-card">
+        <span class="quick-emoji">🎲</span>
+        <span class="quick-text">
+          <span class="quick-title">今天吃什么</span>
+          <span class="quick-sub" id="quick-sub"></span>
+        </span>
+        <span class="quick-arrow">→</span>
+      </button>
+
+      <div class="seasonal" id="seasonal">
+        <div class="seasonal-head">
+          <h3>时令推荐</h3>
+          <span class="seasonal-month" id="seasonal-month"></span>
+        </div>
+        <div class="carousel" id="carousel">
+          <div class="carousel-track" id="carousel-track"></div>
+          <div class="carousel-dots" id="carousel-dots"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- 视图 1：菜单列表 -->
-    <section id="view-list" class="view">
+    <section id="view-list" class="view hidden">
       <div class="search-box">
         <input type="search" id="search-input" placeholder="搜索菜名 / 标签 / 食材…">
       </div>
@@ -125,12 +156,12 @@
       <div id="pick-result" class="pick-result hidden"></div>
     </section>
 
-    <!-- 视图 5：备份 -->
-    <section id="view-backup" class="view hidden">
+    <!-- 视图 5：我的（设置与备份） -->
+    <section id="view-me" class="view hidden">
       <div class="notice">
         ⚠️ 数据存在<b>当前设备、当前浏览器</b>里。换设备使用请先「导出备份」，再到新设备「导入备份」。
       </div>
-      <div id="backup-stats" class="backup-stats"></div>
+      <div id="me-stats" class="backup-stats"></div>
       <div class="persist-row">
         <button class="btn btn-outline btn-small" id="btn-persist">申请持久化存储</button>
         <span class="hint" id="persist-hint"></span>
@@ -139,7 +170,7 @@
         <button class="btn btn-primary" id="btn-install" hidden>📲 安装到桌面 / 主屏幕</button>
         <p class="hint" id="install-hint"></p>
       </div>
-      <div class="backup-actions">
+      <div class="backup-actions" id="me-actions">
         <button class="btn btn-primary" id="btn-export">导出备份</button>
         <button class="btn btn-outline" id="btn-import">导入备份</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
@@ -153,13 +184,24 @@
 
   </main>
 
-  <!-- 浮动添加按钮（只在列表页显示） -->
-  <button id="fab" class="fab" title="添加菜品">＋</button>
+  <!-- 手机底部 Tab 栏（桌面端由 CSS 隐藏） -->
+  <nav class="bottom-nav">
+    <button class="nav-item" data-view="home"><span class="nav-ico">🏠</span><span class="nav-label">首页</span></button>
+    <button class="nav-item" data-view="list"><span class="nav-ico">📖</span><span class="nav-label">菜单</span></button>
+    <button class="nav-item" data-view="pick"><span class="nav-ico">🎲</span><span class="nav-label">抽签</span></button>
+    <button class="nav-item" data-view="me"><span class="nav-ico">⚙️</span><span class="nav-label">我的</span></button>
+  </nav>
 
-  <!-- 引入顺序很重要：后面的文件会调用前面的函数 -->
-  <script src="js/store.js"></script>
-  <script src="js/image.js"></script>
-  <script src="js/random.js"></script>
-  <script src="js/app.js"></script>
+</div>
+
+<!-- 浮动添加按钮（只在列表页显示） -->
+<button id="fab" class="fab" title="添加菜品">＋</button>
+
+<!-- 引入顺序很重要：后面的文件会调用前面的函数 -->
+<script src="js/content.js"></script>
+<script src="js/store.js"></script>
+<script src="js/image.js"></script>
+<script src="js/random.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

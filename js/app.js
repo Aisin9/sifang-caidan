@@ -52,13 +52,13 @@ function heartsHTML(rating, interactive) {
 
 function showView(name) {
   state.view = name;
-  ["list", "detail", "form", "pick", "backup"].forEach(function (v) {
+  ["home", "list", "detail", "form", "pick", "me"].forEach(function (v) {
     document.getElementById("view-" + v).classList.toggle("hidden", v !== name);
   });
 
-  // 导航高亮：详情和表单都算「菜单」页
+  // 导航高亮：详情和表单都算「菜单」页（侧栏和底栏两套导航共用 .nav-item）
   var navKey = (name === "detail" || name === "form") ? "list" : name;
-  document.querySelectorAll(".nav-btn").forEach(function (btn) {
+  document.querySelectorAll(".nav-item").forEach(function (btn) {
     btn.classList.toggle("active", btn.dataset.view === navKey);
   });
 
@@ -66,10 +66,136 @@ function showView(name) {
   document.getElementById("fab").classList.toggle("hidden", name !== "list");
 
   // 进入视图时刷新对应内容
+  if (name === "home") renderHome();
   if (name === "list") renderList();
   if (name === "detail") renderDetail();
   if (name === "pick") renderPickView();
-  if (name === "backup") renderBackupView();
+  if (name === "me") renderMeView();
+}
+
+// ============================================
+// 视图 0：首页
+// ============================================
+
+var carouselTimer = null;   // 自动播放定时器
+var carouselIndex = 0;      // 当前卡片下标
+var carouselBound = false;  // 轮播事件是否已绑定
+
+function renderHome() {
+  // 按时间问候
+  var h = new Date().getHours();
+  var greet = h < 11 ? "早上好" : h < 13 ? "中午好" : h < 18 ? "下午好" : "晚上好";
+  document.getElementById("home-greeting").textContent = greet + "，今天想吃点什么？";
+
+  // 快捷卡副文案
+  var n = getDishes().length;
+  document.getElementById("quick-sub").textContent =
+    n > 0 ? "从 " + n + " 道菜里帮你选一道" : "还没有菜品，先去菜单添加吧";
+
+  // 时令推荐：按当前月份过滤内置库
+  var month = new Date().getMonth() + 1;
+  var items = (typeof SEASONAL_ITEMS !== "undefined" ? SEASONAL_ITEMS : [])
+    .filter(function (s) { return s.months.indexOf(month) !== -1; });
+  var box = document.getElementById("seasonal");
+  if (items.length === 0) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  document.getElementById("seasonal-month").textContent = month + "月 · 时令";
+
+  document.getElementById("carousel-track").innerHTML = items.map(function (s) {
+    return (
+      '<div class="season-card" style="background:linear-gradient(135deg,' + s.colors[0] + "," + s.colors[1] + ')">' +
+        '<span class="season-badge">' + month + "月 · 时令" + "</span>" +
+        '<span class="season-emoji">' + s.emoji + "</span>" +
+        '<div class="season-info">' +
+          '<div class="season-name">' + escapeHtml(s.name) + "</div>" +
+          '<div class="season-blurb">' + escapeHtml(s.blurb) + "</div>" +
+        "</div>" +
+      "</div>"
+    );
+  }).join("");
+
+  renderCarouselDots(items.length);
+  carouselIndex = 0;
+  // 强制复位滚动位置（同时取消上一次可能还在进行的平滑滚动动画）
+  document.getElementById("carousel-track").scrollTo({ left: 0, behavior: "auto" });
+  updateCarouselDots();
+  initCarousel();
+  startCarouselTimer();
+}
+
+// 指示点
+function renderCarouselDots(n) {
+  var html = "";
+  for (var i = 0; i < n; i++) html += '<span class="dot" data-index="' + i + '"></span>';
+  document.getElementById("carousel-dots").innerHTML = html;
+}
+
+function updateCarouselDots() {
+  document.querySelectorAll("#carousel-dots .dot").forEach(function (d) {
+    d.classList.toggle("active", Number(d.dataset.index) === carouselIndex);
+  });
+}
+
+// 手动滑动后同步当前卡片下标（14 是 CSS 里的卡片间距）
+function syncCarouselIndex() {
+  var track = document.getElementById("carousel-track");
+  var card = track.querySelector(".season-card");
+  if (!card) return;
+  var step = card.offsetWidth + 14;
+  carouselIndex = Math.round(track.scrollLeft / step);
+  updateCarouselDots();
+}
+
+// 自动播放到下一张
+function carouselNext() {
+  var track = document.getElementById("carousel-track");
+  var cards = track.querySelectorAll(".season-card");
+  if (cards.length < 2) return;
+  var next = (carouselIndex + 1) % cards.length;
+  if (next === 0) {
+    // 从末尾回到开头：瞬间跳回，避免长距离平滑回扫
+    track.scrollTo({ left: 0, behavior: "auto" });
+  } else {
+    track.scrollTo({ left: next * (cards[0].offsetWidth + 14), behavior: "smooth" });
+  }
+  carouselIndex = next;
+  updateCarouselDots();
+}
+
+// 自动播放定时器
+function startCarouselTimer() {
+  stopCarouselTimer();
+  // 尊重系统的「减弱动态效果」设置：这类用户不自动播放（手动滑动保留）
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  carouselTimer = setInterval(carouselNext, 4000);
+}
+
+function stopCarouselTimer() {
+  if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+}
+
+// 绑定轮播交互（只绑一次）
+function initCarousel() {
+  if (carouselBound) return;
+  carouselBound = true;
+  var track = document.getElementById("carousel-track");
+
+  track.addEventListener("scroll", syncCarouselIndex, { passive: true });
+
+  // 用户开始拖动/触摸：暂停自动播放；松手后重新计时
+  track.addEventListener("pointerdown", stopCarouselTimer);
+  track.addEventListener("touchstart", stopCarouselTimer, { passive: true });
+  ["pointerup", "touchend", "pointercancel"].forEach(function (ev) {
+    track.addEventListener(ev, function () {
+      setTimeout(startCarouselTimer, 400); // 稍等滚动动画结束再继续
+    });
+  });
+
+  // 页面切到后台暂停，回到前台继续
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) stopCarouselTimer();
+    else if (state.view === "home") startCarouselTimer();
+  });
 }
 
 // 渲染一排分类 chips（列表页和抽签页共用）
@@ -452,11 +578,11 @@ function renderPickResult() {
 // 视图 5：备份
 // ============================================
 
-async function renderBackupView() {
+async function renderMeView() {
   var n = getDishes().length;
   var s = await getStorageStats();
   var quotaText = s.supported ? formatSize(s.quotaKB) : "未知";
-  document.getElementById("backup-stats").innerHTML =
+  document.getElementById("me-stats").innerHTML =
     "已存 <b>" + n + "</b> 道菜品 · 存储已用约 <b>" + formatSize(s.usageKB) +
     "</b> / 浏览器配额约 <b>" + quotaText +
     "</b>（配额由浏览器按磁盘空间动态分配，通常几百 MB ~ 几 GB）";
@@ -552,11 +678,16 @@ function handleImportFile(file) {
       }
     } else {
       if (confirm("确定用备份覆盖当前全部数据吗？当前数据将丢失（此操作不可恢复）")) {
-        setData({
+        var restored = {
           version: data.version || 1,
           categories: (data.categories && data.categories.length) ? data.categories : defaultData().categories,
           dishes: data.dishes
-        });
+        };
+        // 打上示例注入标记：防止导入旧备份后示例菜复活
+        if (typeof SAMPLE_DISHES_VERSION !== "undefined") {
+          restored.sampleDishesVersion = SAMPLE_DISHES_VERSION;
+        }
+        setData(restored);
         ok = await saveData();
         if (ok) alert("导入完成：已恢复为备份内容");
       }
@@ -579,9 +710,17 @@ function init() {
 }
 
 function bindAllEvents() {
-  // ---- 顶部导航 ----
-  document.querySelectorAll(".nav-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () { showView(btn.dataset.view); });
+  // ---- 导航（桌面侧栏 + 手机底栏两套，共用 .nav-item 类）----
+  document.querySelectorAll(".nav-item, .brand").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      showView(btn.dataset.view);
+    });
+  });
+
+  // 首页快捷卡 → 抽签页
+  document.getElementById("quick-pick-card").addEventListener("click", function () {
+    showView("pick");
   });
 
   // ---- 列表页 ----
@@ -808,8 +947,8 @@ function bindAllEvents() {
     navigator.storage.persist().catch(function () { /* 忽略 */ });
   }
 
-  // ---- 启动：显示列表页 ----
-  showView("list");
+  // ---- 启动：显示首页 ----
+  showView("home");
 }
 
 // 等 HTML 加载完再执行（脚本在 body 末尾也可以不写这行，
