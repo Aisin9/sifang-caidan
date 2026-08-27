@@ -33,6 +33,16 @@
     <section id="view-home" class="view">
       <h2 id="home-greeting" class="home-greeting"></h2>
 
+      <!-- 好好吃饭打卡 -->
+      <div class="checkin-card" id="checkin">
+        <div class="checkin-head">
+          <h3>好好吃饭</h3>
+          <span class="checkin-stats" id="checkin-stats"></span>
+        </div>
+        <button type="button" class="btn btn-primary checkin-btn" id="checkin-today-btn"></button>
+        <div class="checkin-cal" id="checkin-cal"></div>
+      </div>
+
       <button type="button" class="quick-pick-card" id="quick-pick-card">
         <span class="quick-emoji">🎲</span>
         <span class="quick-text">
@@ -180,6 +190,11 @@
         <p class="hint">清空后无法恢复，建议先导出备份。</p>
         <button class="btn btn-danger" id="btn-clear-all">清空全部数据</button>
       </div>
+      <div class="photo-credits">
+        <h3>图片致谢</h3>
+        <p class="hint">内置菜品与时令照片来自 Wikimedia Commons 的免费授权作品。</p>
+        <div id="photo-credits-list"></div>
+      </div>
     </section>
 
   </main>
@@ -200,6 +215,7 @@
 <!-- 引入顺序很重要：后面的文件会调用前面的函数 -->
 <script src="js/content.js"></script>
 <script src="js/store.js"></script>
+<script src="js/checkin.js"></script>
 <script src="js/image.js"></script>
 <script src="js/random.js"></script>
 <script src="js/app.js"></script>

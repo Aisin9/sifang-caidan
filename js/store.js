@@ -28,9 +28,10 @@ var useIDB = false; // 当前用的是 IndexedDB 还是 localStorage
 // ---- 默认数据结构（第一次使用时初始化）----
 function defaultData() {
   return {
-    version: 2,
+    version: 3,
     categories: ["荤菜", "素菜", "汤羹", "主食", "快手菜"],
-    dishes: []
+    dishes: [],
+    checkins: {}   // 「好好吃饭」打卡记录：{ "2026-08-27": true }
   };
 }
 
@@ -140,8 +141,9 @@ function initStore() {
         d.id = uid();
         d.createdAt = Date.now();
         d.updatedAt = d.createdAt;
-        d.image = (typeof makePlaceholderImage === "function")
-          ? makePlaceholderImage(d.emoji, d.colors, d.name) : "";
+        // 优先用内置真实照片（相对路径），没有时退回渐变占位图
+        d.image = s.image || ((typeof makePlaceholderImage === "function")
+          ? makePlaceholderImage(d.emoji, d.colors, d.name) : "");
         fillDishDefaults(d);
         cache.dishes.push(d);
         if (d.category) addCategoryToData(cache, d.category);
@@ -154,6 +156,41 @@ function initStore() {
           localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
         } catch (e) {
           console.warn("localStorage 不可用，示例菜仅保存在本次会话内存中：", e);
+        }
+      }
+    }
+
+    // 5. 存量迁移：补 checkins 字段 + 老用户库中的 SVG 占位图换成内置照片
+    var changed = false;
+    if (!cache.checkins || typeof cache.checkins !== "object" || Array.isArray(cache.checkins)) {
+      cache.checkins = {};
+      changed = true;
+    }
+    if (typeof SAMPLE_DISHES !== "undefined") {
+      var photoMap = {};
+      SAMPLE_DISHES.forEach(function (s) {
+        if (typeof s.image === "string" && s.image.indexOf("data:") !== 0) {
+          photoMap[s.name] = s.image;
+        }
+      });
+      cache.dishes.forEach(function (d) {
+        // 只替换「旧版注入的 SVG 占位图 + 示例菜名」；
+        // 用户上传的 JPEG dataURL 和刻意清空的图片不受影响
+        if (typeof d.image === "string" &&
+            d.image.indexOf("data:image/svg+xml") === 0 &&
+            photoMap[d.name]) {
+          d.image = photoMap[d.name];
+          changed = true;
+        }
+      });
+    }
+    if (changed) {
+      if (useIDB) await idbSet(MAIN_KEY, cache);
+      else {
+        try {
+          localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
+        } catch (e) {
+          console.warn("localStorage 不可用，迁移结果仅保存在本次会话内存中：", e);
         }
       }
     }
@@ -291,6 +328,30 @@ function clearAllData() {
   if (useIDB) return idbSet(MAIN_KEY, cache);
   localStorage.setItem(LEGACY_KEY, JSON.stringify(cache));
   return Promise.resolve(true);
+}
+
+// ============================================
+// 「好好吃饭」打卡
+// ============================================
+
+function getCheckins() {
+  return getData().checkins || {};
+}
+
+function isChecked(ds) {
+  return !!(getData().checkins || {})[ds];
+}
+
+// 切换某天的打卡状态（ds 格式 "YYYY-MM-DD"），返回 Promise<boolean>
+function toggleCheckin(ds) {
+  var data = getData();
+  if (!data.checkins || typeof data.checkins !== "object") data.checkins = {};
+  if (data.checkins[ds]) {
+    delete data.checkins[ds];
+  } else {
+    data.checkins[ds] = true;
+  }
+  return saveData();
 }
 
 // ============================================

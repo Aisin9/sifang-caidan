@@ -12,7 +12,7 @@
      第一次访问完成安装，第二次访问（刷新）生效
    ============================================ */
 
-var CACHE_NAME = "sifang-caidan-v4";
+var CACHE_NAME = "sifang-caidan-v5";
 var ASSETS = [
   "./",
   "./index.html",
@@ -21,6 +21,7 @@ var ASSETS = [
   "./icon-192.png",
   "./js/content.js",
   "./js/store.js",
+  "./js/checkin.js",
   "./js/image.js",
   "./js/random.js",
   "./js/app.js"

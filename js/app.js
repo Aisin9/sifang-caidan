@@ -19,7 +19,9 @@ var state = {
   formIngredients: [],
   formSteps: [],
   formTags: [],
-  lastPick: null          // 最近一次抽中的菜品
+  lastPick: null,         // 最近一次抽中的菜品
+  checkinYear: null,      // 打卡日历当前显示的年份（会话内保持翻到的月份）
+  checkinMonth: null
 };
 
 // 浏览器把「安装提示事件」暂存在这里（见 beforeinstallprompt）
@@ -29,7 +31,9 @@ var installPromptEvent = null;
 // 如果 HTML 和 JS 不是同一版本（旧缓存混入了新文件），核心元素会缺失。
 // 检测到后自动刷新一次；刷新后仍不一致则交给 init() 给出提示。
 (function () {
-  if (document.getElementById("view-home") && document.getElementById("quick-pick-card")) return;
+  if (document.getElementById("view-home") &&
+      document.getElementById("quick-pick-card") &&
+      document.getElementById("checkin")) return;
   try {
     if (!sessionStorage.getItem("sfc-reload-once")) {
       sessionStorage.setItem("sfc-reload-once", "1");
@@ -60,6 +64,29 @@ function heartsHTML(rating, interactive) {
   }
   return html;
 }
+
+// ---- 全局图片加载失败兜底 ----
+// error 事件不冒泡，必须用捕获阶段监听。
+// 时令卡：移除照片露出渐变底 + emoji；菜品图：换成渐变占位图
+document.addEventListener("error", function (e) {
+  var el = e.target;
+  if (!el || el.tagName !== "IMG") return;
+  if (el.dataset.fbDone) return; // 兜底图再失败就放弃，防死循环
+  el.dataset.fbDone = "1";
+
+  var card = el.closest(".season-card");
+  if (card) {
+    el.remove();
+    var deco = document.createElement("span");
+    deco.className = "season-emoji";
+    deco.textContent = card.dataset.emoji || "🍽️";
+    card.appendChild(deco);
+    return;
+  }
+  var emoji = el.dataset.emoji || "🍽️";
+  var colors = (el.dataset.colors || "#e4ece5,#c6d5c9").split(",");
+  el.src = makePlaceholderImage(emoji, colors, el.alt);
+}, true);
 
 // ---- 视图切换 ----
 
@@ -105,6 +132,9 @@ function renderHome() {
   document.getElementById("quick-sub").textContent =
     n > 0 ? "从 " + n + " 道菜里帮你选一道" : "还没有菜品，先去菜单添加吧";
 
+  // 好好吃饭打卡
+  renderCheckin();
+
   // 时令推荐：按当前月份过滤内置库
   var month = new Date().getMonth() + 1;
   var items = (typeof SEASONAL_ITEMS !== "undefined" ? SEASONAL_ITEMS : [])
@@ -115,10 +145,13 @@ function renderHome() {
   document.getElementById("seasonal-month").textContent = month + "月 · 时令";
 
   document.getElementById("carousel-track").innerHTML = items.map(function (s) {
+    // 渐变底是照片加载中/失败时的兜底；照片成功加载后盖在上面
     return (
-      '<div class="season-card" style="background:linear-gradient(135deg,' + s.colors[0] + "," + s.colors[1] + ')">' +
+      '<div class="season-card" data-name="' + escapeHtml(s.name) + '" data-emoji="' + escapeHtml(s.emoji) +
+        '" data-colors="' + escapeHtml(s.colors.join(",")) + '"' +
+        ' style="background:linear-gradient(135deg,' + s.colors[0] + "," + s.colors[1] + ')">' +
+        '<img class="season-img" src="' + escapeHtml(s.image) + '" alt="' + escapeHtml(s.name) + '" loading="lazy">' +
         '<span class="season-badge">' + month + "月 · 时令" + "</span>" +
-        '<span class="season-emoji">' + s.emoji + "</span>" +
         '<div class="season-info">' +
           '<div class="season-name">' + escapeHtml(s.name) + "</div>" +
           '<div class="season-blurb">' + escapeHtml(s.blurb) + "</div>" +
@@ -211,6 +244,65 @@ function initCarousel() {
   });
 }
 
+// ============================================
+// 好好吃饭打卡
+// ============================================
+
+// 渲染打卡卡（今天按钮 + 统计 + 月历）
+function renderCheckin() {
+  var today = new Date();
+  var todayDs = toDateKey(today);
+  // 首次进入取今天所在月；会话内保持用户翻到的月份
+  if (state.checkinYear === null || state.checkinMonth === null) {
+    state.checkinYear = today.getFullYear();
+    state.checkinMonth = today.getMonth() + 1;
+  }
+  var y = state.checkinYear;
+  var m = state.checkinMonth;
+  var checkins = getCheckins();
+
+  // 统计：显示月的打卡天数 + 从今天起的连续天数
+  var monthCount = countInMonth(checkins, y, m);
+  var streak = computeStreak(checkins, todayDs);
+  document.getElementById("checkin-stats").textContent =
+    "打卡 " + monthCount + " 天 · 连续 " + streak + " 天";
+
+  // 今日按钮
+  var btn = document.getElementById("checkin-today-btn");
+  if (isChecked(todayDs)) {
+    btn.textContent = "已打卡 ✅（点此取消）";
+    btn.classList.remove("btn-primary");
+    btn.classList.add("btn-outline");
+  } else {
+    btn.textContent = "今日已吃好 ✅";
+    btn.classList.remove("btn-outline");
+    btn.classList.add("btn-primary");
+  }
+
+  // 月历
+  var cells = buildMonthGrid(y, m, todayDs);
+  var weekdays = ["一", "二", "三", "四", "五", "六", "日"];
+  var html =
+    '<div class="cal-nav">' +
+      '<button type="button" class="cal-nav-btn" data-nav="-1">◀</button>' +
+      '<span class="cal-title">' + y + "年" + m + "月" + "</span>" +
+      '<button type="button" class="cal-nav-btn" data-nav="1">▶</button>' +
+    "</div>" +
+    '<div class="cal-grid">' +
+      weekdays.map(function (w) { return '<span class="cal-wd">' + w + "</span>"; }).join("") +
+      cells.map(function (c) {
+        if (!c.inMonth) return '<span class="cal-day blank"></span>';
+        var cls = "cal-day";
+        if (isChecked(c.ds)) cls += " checked";
+        if (c.ds === todayDs) cls += " today";
+        if (c.isFuture) cls += " future";
+        return '<button type="button" class="' + cls + '" data-ds="' + c.ds + '"' +
+          (c.isFuture ? " disabled" : "") + ">" + c.day + "</button>";
+      }).join("") +
+    "</div>";
+  document.getElementById("checkin-cal").innerHTML = html;
+}
+
 // 渲染一排分类 chips（列表页和抽签页共用）
 // selected: 当前选中的分类名；onSelect: 点 chip 后的回调
 function renderChips(container, selected, onSelect) {
@@ -242,7 +334,9 @@ function filterDishes(query, category) {
 
 function dishCardHTML(d) {
   var img = d.image
-    ? '<img src="' + d.image + '" alt="' + escapeHtml(d.name) + '" loading="lazy">'
+    ? '<img src="' + d.image + '" alt="' + escapeHtml(d.name) + '" loading="lazy"' +
+      (d.emoji ? ' data-emoji="' + escapeHtml(d.emoji) + '"' : "") +
+      (d.colors ? ' data-colors="' + escapeHtml(d.colors.join(",")) + '"' : "") + ">"
     : '<div class="card-placeholder">🍽️</div>';
   var tags = (d.tags || []).slice(0, 3).map(function (t) {
     return '<span class="tag">' + escapeHtml(t) + "</span>";
@@ -293,7 +387,9 @@ function renderDetail() {
   if (!d) { showView("list"); return; } // 菜品已被删，回列表
 
   var img = d.image
-    ? '<div class="detail-img"><img src="' + d.image + '" alt="' + escapeHtml(d.name) + '"></div>'
+    ? '<div class="detail-img"><img src="' + d.image + '" alt="' + escapeHtml(d.name) + '"' +
+      (d.emoji ? ' data-emoji="' + escapeHtml(d.emoji) + '"' : "") +
+      (d.colors ? ' data-colors="' + escapeHtml(d.colors.join(",")) + '"' : "") + "></div>"
     : "";
   var ings = (d.ingredients || []).map(function (i) { return "<li>" + escapeHtml(i) + "</li>"; }).join("");
   var steps = (d.steps || []).map(function (s) { return "<li>" + escapeHtml(s) + "</li>"; }).join("");
@@ -567,7 +663,9 @@ function handlePick() {
 function renderPickResult() {
   var d = state.lastPick;
   var img = d.image
-    ? '<div class="result-img"><img src="' + d.image + '" alt="' + escapeHtml(d.name) + '"></div>'
+    ? '<div class="result-img"><img src="' + d.image + '" alt="' + escapeHtml(d.name) + '"' +
+      (d.emoji ? ' data-emoji="' + escapeHtml(d.emoji) + '"' : "") +
+      (d.colors ? ' data-colors="' + escapeHtml(d.colors.join(",")) + '"' : "") + "></div>"
     : "";
   var div = document.getElementById("pick-result");
   div.innerHTML =
@@ -601,6 +699,16 @@ async function renderMeView() {
     "</b>（配额由浏览器按磁盘空间动态分配，通常几百 MB ~ 几 GB）";
   updatePersistHint();
   renderInstallHint();
+  renderPhotoCredits();
+}
+
+// 内置照片的许可致谢（Wikimedia Commons）
+function renderPhotoCredits() {
+  var list = (typeof PHOTO_CREDITS !== "undefined" ? PHOTO_CREDITS : []);
+  document.getElementById("photo-credits-list").innerHTML = list.map(function (c) {
+    return '<div class="credit-item">' + escapeHtml(c.file) +
+      " — " + escapeHtml(c.author) + " · " + escapeHtml(c.license) + "</div>";
+  }).join("");
 }
 
 // 显示持久化存储状态；已获准则提示用户无需担心数据被清理
@@ -716,7 +824,9 @@ function handleImportFile(file) {
 
 function init() {
   // 版本检查：核心元素缺失说明 HTML/JS 版本不一致（自动刷新也没救回来）
-  if (!document.getElementById("view-home") || !document.getElementById("quick-pick-card")) {
+  if (!document.getElementById("view-home") ||
+      !document.getElementById("quick-pick-card") ||
+      !document.getElementById("checkin")) {
     alert("页面缓存版本不一致。\n请再刷新一两次；若仍不行，请清除该网站的浏览器缓存数据后重试。");
     return;
   }
@@ -747,6 +857,29 @@ function bindAllEvents() {
   // 首页快捷卡 → 抽签页
   document.getElementById("quick-pick-card").addEventListener("click", function () {
     showView("pick");
+  });
+
+  // ---- 好好吃饭打卡 ----
+  document.getElementById("checkin-today-btn").addEventListener("click", async function () {
+    await toggleCheckin(toDateKey(new Date()));
+    renderCheckin();
+  });
+  // 日历：事件委托处理翻月和点日期打卡
+  document.getElementById("checkin-cal").addEventListener("click", async function (e) {
+    var nav = e.target.closest("[data-nav]");
+    if (nav) {
+      var dir = Number(nav.dataset.nav);
+      state.checkinMonth += dir;
+      if (state.checkinMonth < 1) { state.checkinMonth = 12; state.checkinYear--; }
+      if (state.checkinMonth > 12) { state.checkinMonth = 1; state.checkinYear++; }
+      renderCheckin();
+      return;
+    }
+    var day = e.target.closest("[data-ds]");
+    if (day && !day.classList.contains("future")) {
+      await toggleCheckin(day.dataset.ds);
+      renderCheckin();
+    }
   });
 
   // ---- 列表页 ----

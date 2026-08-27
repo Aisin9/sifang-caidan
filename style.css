@@ -90,6 +90,18 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: var(--space-8) var(--space-6) 96px;
+  /* 垂直居中方案：容器成 flex 列并撑满视口高度，视图上下 auto 均分剩余空间 */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;   /* 兜底 */
+  min-height: 100dvh;  /* 动态视口：地址栏收起/展开时高度正确 */
+}
+
+.view {
+  width: 100%;
+  flex-shrink: 0;        /* 关键：内容高于容器时禁止压缩 */
+  margin-top: auto;      /* 短内容：上下 auto 均分 = 垂直居中 */
+  margin-bottom: auto;   /* 长内容：无剩余空间时 auto 归零，自然撑高滚动 */
 }
 
 /* ---- 4. 导航 ---- */
@@ -281,6 +293,92 @@ body {
 .quick-sub { font-size: 13px; opacity: .85; }
 .quick-arrow { margin-left: auto; font-size: 22px; }
 
+/* 好好吃饭打卡卡 */
+.checkin-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.checkin-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+.checkin-head h3 { font-size: 17px; color: var(--primary-dark); }
+.checkin-stats { font-size: 13px; color: var(--text-mid); }
+
+.checkin-btn { width: 100%; margin-bottom: var(--space-4); }
+
+.checkin-cal { margin-top: var(--space-2); }
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.cal-title { font-size: 15px; font-weight: bold; color: var(--text); min-width: 96px; text-align: center; }
+.cal-nav-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-mid);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.cal-nav-btn:hover { border-color: var(--primary-dark); color: var(--primary-dark); }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-wd {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-light);
+  padding: 4px 0;
+}
+.cal-day {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.cal-day:hover { background: var(--primary-faint); }
+.cal-day.blank { cursor: default; }
+.cal-day.blank:hover { background: transparent; }
+
+.cal-day.checked {
+  background: var(--primary);
+  color: #fff;
+  font-weight: bold;
+}
+.cal-day.checked::after { content: ""; display: block; font-size: 8px; }
+.cal-day.today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  font-weight: bold;
+}
+.cal-day.future {
+  color: var(--border-strong);
+  cursor: default;
+}
+.cal-day.future:hover { background: transparent; }
+
 .seasonal { margin-top: var(--space-8); }
 .seasonal-head {
   display: flex;
@@ -313,6 +411,25 @@ body {
   overflow: hidden;
   box-shadow: var(--shadow);
 }
+
+/* 照片盖在渐变底上（渐变是加载中/失败兜底）；底部渐变遮罩保证文字可读 */
+.season-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.season-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(20, 30, 24, .62) 0%, rgba(20, 30, 24, .12) 46%, rgba(20, 30, 24, 0) 72%);
+  pointer-events: none;
+}
+.season-badge,
+.season-info { z-index: 1; }
+.season-emoji { z-index: 1; }
 
 .season-badge {
   position: absolute;
@@ -647,6 +764,15 @@ body {
   padding: 16px 18px;
 }
 .danger-zone h3 { color: var(--danger); margin-bottom: 4px; }
+
+.photo-credits { margin-top: var(--space-8); }
+.photo-credits h3 { font-size: 15px; color: var(--text-mid); margin-bottom: 4px; }
+.credit-item {
+  font-size: 12px;
+  color: var(--text-light);
+  padding: 3px 0;
+  word-break: break-all;
+}
 
 /* ---- 13. 浮动添加按钮 ---- */
 
