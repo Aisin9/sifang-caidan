@@ -115,7 +115,8 @@ body {
   color: var(--text);
   cursor: pointer;
 }
-.brand-ico { font-size: 26px; }
+.brand-ico { display: flex; align-items: center; justify-content: center; }
+.brand-ico svg { width: 28px; height: 28px; display: block; color: var(--primary-dark); }
 .brand-name {
   font-size: 11px;
   font-weight: bold;
@@ -148,7 +149,8 @@ body {
 .nav-item:hover { background: var(--primary-faint); color: var(--primary-dark); }
 .nav-item.active { background: var(--primary); color: #fff; }
 
-.nav-ico { font-size: 22px; line-height: 1; }
+.nav-ico { display: flex; align-items: center; justify-content: center; }
+.nav-ico svg { width: 24px; height: 24px; display: block; }
 .nav-label { font-size: 11px; }
 
 /* 手机底栏（基础态隐藏，820px 断点里才显示） */
@@ -287,7 +289,8 @@ body {
   text-align: left;
 }
 .quick-pick-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-.quick-emoji { font-size: 44px; line-height: 1; }
+.quick-emoji { display: flex; align-items: center; justify-content: center; }
+.quick-emoji svg { width: 40px; height: 40px; display: block; }
 .quick-text { display: flex; flex-direction: column; }
 .quick-title { font-size: 18px; font-weight: bold; }
 .quick-sub { font-size: 13px; opacity: .85; }

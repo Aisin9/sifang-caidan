@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Apple 风格扁平应用图标：鼠尾草绿底 + 白色饭碗与热气（直线简洁造型） -->
+  <rect width="512" height="512" rx="115" fill="#6b9080"/>
+  <!-- 热气 -->
+  <path d="M222 158c0-22 18-22 18-44" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  <path d="M290 158c0-22 18-22 18-44" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  <!-- 碗：半圆 + 碗沿（用贝塞尔曲线精确画下半圆，避免 arc 方向歧义） -->
+  <path d="M128 268h256" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  <path d="M128 268C128 339 185.3 396 256 396C326.7 396 384 339 384 268Z" fill="#ffffff"/>
+  <!-- 碗内的主食弧线（用底色描） -->
+  <path d="M160 268c12 40 36 60 96 60s84-20 96-60" fill="none" stroke="#6b9080" stroke-width="14" stroke-linecap="round"/>
+</svg>
