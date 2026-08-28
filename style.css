@@ -40,6 +40,15 @@
   /* 间距 */
   --space-1: 4px; --space-2: 8px; --space-3: 12px;
   --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px;
+  --space-card: 12px;          /* 分组卡片块间距 */
+
+  /* 字号层级：大标题 / 区块标题 / 强调正文 / 正文 / 辅助 / 角标 */
+  --text-xl: 34px;
+  --text-lg: 19px;
+  --text-md: 17px;
+  --text-base: 15px;
+  --text-sm: 13px;
+  --text-xs: 12px;
 
   /* 布局 */
   --nav-w: 76px;               /* 桌面侧栏宽 */
@@ -100,8 +109,39 @@ body {
 .view {
   width: 100%;
   flex-shrink: 0;        /* 关键：内容高于容器时禁止压缩 */
-  margin-top: auto;      /* 短内容：上下 auto 均分 = 垂直居中 */
-  margin-bottom: auto;   /* 长内容：无剩余空间时 auto 归零，自然撑高滚动 */
+  margin-top: 0;         /* iOS 大标题风格：内容贴顶 */
+  margin-bottom: 0;
+}
+
+/* 抽签页是唯一保留垂直居中的页面（居中更好看） */
+#view-pick { margin-top: auto; margin-bottom: auto; }
+
+/* ---- iOS 大标题 / 分组标签 / 卡片组件 ---- */
+
+.page-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+  margin: 0 0 var(--space-4);
+}
+.page-title--sm { font-size: 26px; }
+
+.section-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+  padding: 0 var(--space-1);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  margin-bottom: var(--space-card);
 }
 
 /* ---- 4. 导航 ---- */
@@ -141,7 +181,7 @@ body {
   gap: 3px;
   padding: 10px 0;
   width: 56px;
-  border-radius: var(--radius-sm);
+  border-radius: 14px;
   color: var(--text-light);
   transition: all var(--transition);
   font-family: inherit;
@@ -150,18 +190,20 @@ body {
 .nav-item.active { background: var(--primary); color: #fff; }
 
 .nav-ico { display: flex; align-items: center; justify-content: center; }
-.nav-ico svg { width: 24px; height: 24px; display: block; }
+.nav-ico svg { width: 24px; height: 24px; display: block; transition: transform var(--transition); }
 .nav-label { font-size: 11px; }
 
-/* 手机底栏（基础态隐藏，820px 断点里才显示） */
+/* 手机底栏（基础态隐藏，820px 断点里才显示）：iOS 毛玻璃 + 染色选中态 */
 .bottom-nav {
   position: fixed;
   inset-inline: 0;
   bottom: 0;
   height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, .82);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(47, 62, 54, .08);
   z-index: 30;
 }
 .bottom-nav .nav-item {
@@ -173,13 +215,16 @@ body {
   gap: 2px;
   background: transparent;
 }
+.bottom-nav .nav-item:hover { background: transparent; }
 .bottom-nav .nav-item.active { background: transparent; color: var(--primary-dark); }
 .bottom-nav .nav-item.active .nav-ico {
-  background: var(--primary);
-  color: #fff;
-  padding: 3px 14px;
-  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--primary-dark);
+  padding: 0;
 }
+.bottom-nav .nav-item.active .nav-ico svg { transform: scale(1.1); }
+.bottom-nav .nav-label { font-size: 10px; }
+.bottom-nav .nav-item.active .nav-label { font-weight: 600; }
 
 /* ---- 5. 通用组件 ---- */
 
@@ -255,9 +300,6 @@ body {
 .notice {
   background: var(--accent-light);
   border: 1px solid #f0d48a;
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  margin-bottom: 18px;
   font-size: 14px;
 }
 
@@ -266,13 +308,27 @@ body {
 
 /* ---- 6. 首页 ---- */
 
-.home-greeting {
-  font-size: 26px;
-  margin-bottom: var(--space-5);
-  color: var(--text);
+/* 今日饭记摘要卡 */
+.today-meals-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-3);
 }
+.today-meals-head h3 { font-size: var(--text-md); color: var(--text); }
+.today-meals-count { font-size: var(--text-sm); color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.today-meals-latest {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+}
+.today-meals-latest-text { color: var(--text-mid); }
+#btn-record-meal { width: 100%; }
 
 .quick-pick-card {
+  margin-bottom: var(--space-card);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -296,23 +352,15 @@ body {
 .quick-sub { font-size: 13px; opacity: .85; }
 .quick-arrow { margin-left: auto; font-size: 22px; }
 
-/* 好好吃饭打卡卡 */
-.checkin-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: var(--space-5);
-  margin-top: var(--space-4);
-}
-
+/* 好好吃饭打卡卡（card 组件提供底色/圆角/阴影/间距） */
 .checkin-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: var(--space-3);
 }
-.checkin-head h3 { font-size: 17px; color: var(--primary-dark); }
-.checkin-stats { font-size: 13px; color: var(--text-mid); }
+.checkin-head h3 { font-size: var(--text-md); color: var(--text); }
+.checkin-stats { font-size: var(--text-sm); color: var(--text-mid); font-variant-numeric: tabular-nums; }
 
 .checkin-btn { width: 100%; margin-bottom: var(--space-4); }
 
@@ -325,7 +373,7 @@ body {
   gap: var(--space-4);
   margin-bottom: var(--space-3);
 }
-.cal-title { font-size: 15px; font-weight: bold; color: var(--text); min-width: 96px; text-align: center; }
+.cal-title { font-size: var(--text-base); font-weight: bold; color: var(--text); min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
 .cal-nav-btn {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -382,15 +430,14 @@ body {
 }
 .cal-day.future:hover { background: transparent; }
 
-.seasonal { margin-top: var(--space-8); }
+.seasonal { margin-top: var(--space-5); }
 .seasonal-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: 0;
 }
-.seasonal-head h3 { font-size: 19px; color: var(--primary-dark); }
-.seasonal-month { font-size: 13px; color: var(--text-light); }
+.seasonal-month { font-size: var(--text-sm); color: var(--text-light); }
 
 /* ---- 7. 时令轮播 ---- */
 
@@ -586,23 +633,33 @@ body {
 
 /* ---- 10. 表单 ---- */
 
-#form-title { margin-bottom: 18px; color: var(--primary-dark); }
-
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; font-weight: bold; margin-bottom: 6px; }
 
-.form-group input[type="text"] {
+/* 表单输入统一风格：text / date / search / textarea */
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group input[type="search"],
+.form-group textarea {
   width: 100%;
   padding: 10px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 15px;
+  font-size: var(--text-base);
   background: var(--surface-2);
   outline: none;
   transition: border-color var(--transition);
   color: var(--text);
+  font-family: inherit;
 }
-.form-group input[type="text"]:focus { border-color: var(--primary); background: var(--surface); }
+.form-group input[type="text"]:focus,
+.form-group input[type="date"]:focus,
+.form-group input[type="search"]:focus,
+.form-group textarea:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+.form-group textarea { resize: vertical; }
 .form-group input.error { border-color: var(--danger); }
 
 .required { color: var(--danger); }
@@ -726,13 +783,7 @@ body {
 .pick-result { margin-top: var(--space-4); }
 .pop-in { animation: result-pop 0.4s ease; }
 
-.result-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: 20px;
-  text-align: center;
-}
+.result-card { text-align: center; }
 .result-card h3 { font-size: 24px; margin: 10px 0 6px; }
 .result-img { border-radius: var(--radius); overflow: hidden; max-width: 100%; }
 .result-img img { width: 100%; max-height: 240px; object-fit: cover; display: block; }
@@ -740,13 +791,7 @@ body {
 
 /* ---- 12. 我的 ---- */
 
-.backup-stats {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 14px 18px;
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 14px;
-}
+#me-stats b { font-variant-numeric: tabular-nums; }
 
 .persist-row {
   display: flex;
@@ -763,8 +808,6 @@ body {
 .danger-zone {
   border: 1px solid var(--danger-border);
   background: var(--danger-bg);
-  border-radius: var(--radius);
-  padding: 16px 18px;
 }
 .danger-zone h3 { color: var(--danger); margin-bottom: 4px; }
 
@@ -776,6 +819,85 @@ body {
   padding: 3px 0;
   word-break: break-all;
 }
+
+/* ---- 12.5 饭记 ---- */
+
+.meals-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.meal-day { margin-top: var(--space-4); }
+
+.meal-card { cursor: pointer; }
+.meal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.meal-time {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}
+.meal-img { border-radius: var(--radius-sm); overflow: hidden; margin-bottom: var(--space-3); }
+.meal-img img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+.meal-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: var(--space-2); }
+.meal-chip { font-size: var(--text-sm); padding: 4px 14px; }
+.meal-note { font-size: var(--text-base); color: var(--text-mid); word-break: break-all; }
+
+/* 餐次分段控件（iOS segmented：灰轨道 + 白色悬浮选中块） */
+.meal-seg {
+  display: flex;
+  background: var(--primary-faint);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.meal-seg-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  font-size: var(--text-base);
+  color: var(--text-mid);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.meal-seg-btn.active {
+  background: var(--surface);
+  color: var(--primary-dark);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 菜谱多选列表 */
+.meal-dish-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  margin-top: var(--space-2);
+}
+.meal-dish-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.meal-dish-row:last-child { border-bottom: none; }
+.meal-dish-name { flex: 1; font-size: var(--text-base); }
 
 /* ---- 13. 浮动添加按钮 ---- */
 
@@ -809,6 +931,11 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* 桌面：大标题放大 */
+@media (min-width: 821px) {
+  .page-title { font-size: 38px; }
+}
+
 /* 平板/手机：侧栏切换为底栏 */
 @media (max-width: 820px) {
   .app { display: block; }
@@ -825,7 +952,7 @@ body {
 
 /* 小屏手机微调 */
 @media (max-width: 600px) {
-  .home-greeting { font-size: 22px; }
+  .page-title { font-size: 30px; }
   .dish-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
   .btn { padding: 9px 14px; font-size: 14px; }
   .btn-big { font-size: 18px; }

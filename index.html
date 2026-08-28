@@ -21,6 +21,7 @@
     </a>
     <nav class="side-nav">
       <button class="nav-item active" data-view="home"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.5V19a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9.5"/><path d="M9.8 21v-6h4.4v6"/></svg></span><span class="nav-label">首页</span></button>
+      <button class="nav-item" data-view="meals"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 3v3M10.2 3v3"/><path d="M5.8 3c0 1.2.9 2.1 2.2 2.1s2.2-.9 2.2-2.1"/><path d="M8 6v14.5"/><ellipse cx="16.5" cy="6.5" rx="3.1" ry="2.7"/><path d="M16.5 9.2V20.5"/></svg></span><span class="nav-label">饭记</span></button>
       <button class="nav-item" data-view="list"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.6C10.3 5 7.3 4.5 3.8 5.1v13.5c3.5-.6 6.5-.1 8.2 1.4 1.7-1.5 4.7-2 8.2-1.4V5.1C16.7 4.5 13.7 5 12 6.6Z"/><path d="M12 6.6V20"/></svg></span><span class="nav-label">菜单</span></button>
       <button class="nav-item" data-view="pick"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="3.8" width="16.4" height="16.4" rx="4"/><circle cx="8.2" cy="8.2" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.8" cy="15.8" r="1.35" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">抽签</span></button>
       <button class="nav-item" data-view="me"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="7.8" r="3.8"/><path d="M4.8 20.6c.8-3.4 3.7-5.3 7.2-5.3s6.4 1.9 7.2 5.3"/></svg></span><span class="nav-label">我的</span></button>
@@ -31,15 +32,26 @@
 
     <!-- 视图 0：首页 -->
     <section id="view-home" class="view">
-      <h2 id="home-greeting" class="home-greeting"></h2>
+      <h1 id="home-greeting" class="page-title"></h1>
+
+      <!-- 今日饭记摘要 -->
+      <div class="card today-meals-card" id="today-meals">
+        <div class="today-meals-head">
+          <h3>今日饭记</h3>
+          <span class="today-meals-count" id="today-meals-count">0 顿</span>
+        </div>
+        <div id="today-meals-latest" class="today-meals-latest"></div>
+        <button class="btn btn-primary" id="btn-record-meal">记录这顿饭</button>
+      </div>
 
       <!-- 好好吃饭打卡 -->
-      <div class="checkin-card" id="checkin">
+      <div class="card" id="checkin">
         <div class="checkin-head">
           <h3>好好吃饭</h3>
           <span class="checkin-stats" id="checkin-stats"></span>
         </div>
         <button type="button" class="btn btn-primary checkin-btn" id="checkin-today-btn"></button>
+        <p class="hint">记录饭记会自动打卡 · 点日期也可手动补打</p>
         <div class="checkin-cal" id="checkin-cal"></div>
       </div>
 
@@ -54,7 +66,7 @@
 
       <div class="seasonal" id="seasonal">
         <div class="seasonal-head">
-          <h3>时令推荐</h3>
+          <h3 class="section-label">时令推荐</h3>
           <span class="seasonal-month" id="seasonal-month"></span>
         </div>
         <div class="carousel" id="carousel">
@@ -66,6 +78,7 @@
 
     <!-- 视图 1：菜单列表 -->
     <section id="view-list" class="view hidden">
+      <h1 class="page-title">菜单</h1>
       <div class="search-box">
         <input type="search" id="search-input" placeholder="搜索菜名 / 标签 / 食材…">
       </div>
@@ -88,7 +101,7 @@
 
     <!-- 视图 3：添加 / 编辑表单 -->
     <section id="view-form" class="view hidden">
-      <h2 id="form-title">添加菜品</h2>
+      <h2 id="form-title" class="page-title page-title--sm">添加菜品</h2>
       <form id="dish-form" novalidate>
         <div class="form-group">
           <label for="f-name">菜名 <span class="required">*</span></label>
@@ -152,8 +165,65 @@
       </form>
     </section>
 
+    <!-- 视图 3.5：饭记时间线 -->
+    <section id="view-meals" class="view hidden">
+      <div class="meals-head">
+        <h1 class="page-title">饭记</h1>
+        <button class="btn btn-primary" id="btn-new-meal">记录这顿饭</button>
+      </div>
+      <div id="meals-timeline"></div>
+      <div id="meals-empty" class="empty hidden"></div>
+    </section>
+
+    <!-- 视图 3.6：记录 / 编辑饭记表单 -->
+    <section id="view-meal-form" class="view hidden">
+      <h2 id="meal-form-title" class="page-title page-title--sm">记录这顿饭</h2>
+      <form id="meal-form" novalidate>
+        <div class="form-group">
+          <label>成品照片 <span class="hint-inline">（可选）</span></label>
+          <input type="file" id="mf-image" accept="image/*" hidden>
+          <div id="mf-image-preview-box" class="image-preview-box hidden">
+            <img id="mf-image-preview" alt="饭记照片预览">
+            <button type="button" class="btn btn-small btn-danger" id="mf-btn-remove-image">移除照片</button>
+          </div>
+          <button type="button" class="btn btn-outline btn-small" id="mf-btn-pick-image">选择照片</button>
+          <p class="hint">照片会自动压缩（最长边 1000px），不选照片也能保存</p>
+        </div>
+        <div class="form-group">
+          <label>餐次</label>
+          <div class="meal-seg" id="mf-meal-type">
+            <button type="button" class="meal-seg-btn" data-type="早餐">早餐</button>
+            <button type="button" class="meal-seg-btn" data-type="午餐">午餐</button>
+            <button type="button" class="meal-seg-btn" data-type="晚餐">晚餐</button>
+            <button type="button" class="meal-seg-btn" data-type="加餐">加餐</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="mf-date">日期</label>
+          <input type="date" id="mf-date">
+          <p class="hint">可以补记过去的饭，不能选未来日期</p>
+        </div>
+        <div class="form-group">
+          <label>做了哪些菜 <span class="hint-inline">（可选，可多选）</span></label>
+          <input type="search" id="mf-dish-search" placeholder="搜索菜名 / 标签 / 食材…">
+          <div id="mf-dish-list" class="meal-dish-list"></div>
+          <p class="hint">已选 <b id="mf-dish-count">0</b> 道</p>
+        </div>
+        <div class="form-group">
+          <label for="mf-note">感想 <span class="hint-inline">（可选，最多 200 字）</span></label>
+          <textarea id="mf-note" rows="3" maxlength="200" placeholder="今天这顿饭怎么样？"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="mf-btn-save">保存</button>
+          <button type="button" class="btn" id="mf-btn-cancel">取消</button>
+          <button type="button" class="btn btn-danger" id="mf-btn-delete" hidden>删除饭记</button>
+        </div>
+      </form>
+    </section>
+
     <!-- 视图 4：今天吃什么 -->
     <section id="view-pick" class="view hidden">
+      <h1 class="page-title pick-title">今天吃什么</h1>
       <div class="pick-mode">
         <button class="seg-btn active" data-mode="equal">等概率</button>
         <button class="seg-btn" data-mode="weighted">按喜爱度加权</button>
@@ -168,10 +238,11 @@
 
     <!-- 视图 5：我的（设置与备份） -->
     <section id="view-me" class="view hidden">
-      <div class="notice">
+      <h1 class="page-title">我的</h1>
+      <div class="notice card">
         ⚠️ 数据存在<b>当前设备、当前浏览器</b>里。换设备使用请先「导出备份」，再到新设备「导入备份」。
       </div>
-      <div id="me-stats" class="backup-stats"></div>
+      <div id="me-stats" class="card"></div>
       <div class="persist-row">
         <button class="btn btn-outline btn-small" id="btn-persist">申请持久化存储</button>
         <span class="hint" id="persist-hint"></span>
@@ -185,7 +256,7 @@
         <button class="btn btn-outline" id="btn-import">导入备份</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
       </div>
-      <div class="danger-zone">
+      <div class="danger-zone card">
         <h3>危险操作</h3>
         <p class="hint">清空后无法恢复，建议先导出备份。</p>
         <button class="btn btn-danger" id="btn-clear-all">清空全部数据</button>
@@ -202,6 +273,7 @@
   <!-- 手机底部 Tab 栏（桌面端由 CSS 隐藏） -->
   <nav class="bottom-nav">
     <button class="nav-item" data-view="home"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.5V19a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9.5"/><path d="M9.8 21v-6h4.4v6"/></svg></span><span class="nav-label">首页</span></button>
+    <button class="nav-item" data-view="meals"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 3v3M10.2 3v3"/><path d="M5.8 3c0 1.2.9 2.1 2.2 2.1s2.2-.9 2.2-2.1"/><path d="M8 6v14.5"/><ellipse cx="16.5" cy="6.5" rx="3.1" ry="2.7"/><path d="M16.5 9.2V20.5"/></svg></span><span class="nav-label">饭记</span></button>
     <button class="nav-item" data-view="list"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.6C10.3 5 7.3 4.5 3.8 5.1v13.5c3.5-.6 6.5-.1 8.2 1.4 1.7-1.5 4.7-2 8.2-1.4V5.1C16.7 4.5 13.7 5 12 6.6Z"/><path d="M12 6.6V20"/></svg></span><span class="nav-label">菜单</span></button>
     <button class="nav-item" data-view="pick"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="3.8" width="16.4" height="16.4" rx="4"/><circle cx="8.2" cy="8.2" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="15.8" cy="15.8" r="1.35" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">抽签</span></button>
     <button class="nav-item" data-view="me"><span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="7.8" r="3.8"/><path d="M4.8 20.6c.8-3.4 3.7-5.3 7.2-5.3s6.4 1.9 7.2 5.3"/></svg></span><span class="nav-label">我的</span></button>

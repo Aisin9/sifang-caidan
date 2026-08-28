@@ -21,7 +21,15 @@ var state = {
   formTags: [],
   lastPick: null,         // 最近一次抽中的菜品
   checkinYear: null,      // 打卡日历当前显示的年份（会话内保持翻到的月份）
-  checkinMonth: null
+  checkinMonth: null,
+  // 饭记表单的临时数据（保存前只存在内存里）
+  editingMealId: null,    // 正在编辑的饭记 id（null = 新增）
+  mealFormImage: "",
+  mealFormDishIds: [],    // 勾选顺序即数组顺序
+  mealFormType: "晚餐",
+  mealFormDate: "",       // 打开表单时固化，避免跨零点漂移
+  mealFormNote: "",
+  detailBack: "list"      // 详情页「返回」去向："list" | "meals" | "pick"
 };
 
 // 浏览器把「安装提示事件」暂存在这里（见 beforeinstallprompt）
@@ -33,7 +41,8 @@ var installPromptEvent = null;
 (function () {
   if (document.getElementById("view-home") &&
       document.getElementById("quick-pick-card") &&
-      document.getElementById("checkin")) return;
+      document.getElementById("checkin") &&
+      document.getElementById("view-meals")) return;
   try {
     if (!sessionStorage.getItem("sfc-reload-once")) {
       sessionStorage.setItem("sfc-reload-once", "1");
@@ -92,12 +101,13 @@ document.addEventListener("error", function (e) {
 
 function showView(name) {
   state.view = name;
-  ["home", "list", "detail", "form", "pick", "me"].forEach(function (v) {
+  ["home", "list", "detail", "form", "pick", "me", "meals", "meal-form"].forEach(function (v) {
     document.getElementById("view-" + v).classList.toggle("hidden", v !== name);
   });
 
-  // 导航高亮：详情和表单都算「菜单」页（侧栏和底栏两套导航共用 .nav-item）
-  var navKey = (name === "detail" || name === "form") ? "list" : name;
+  // 导航高亮：detail/form 算「菜单」页，meal-form 算「饭记」页
+  var navKey = (name === "detail" || name === "form") ? "list"
+    : (name === "meal-form") ? "meals" : name;
   document.querySelectorAll(".nav-item").forEach(function (btn) {
     btn.classList.toggle("active", btn.dataset.view === navKey);
   });
@@ -111,6 +121,7 @@ function showView(name) {
   if (name === "detail") renderDetail();
   if (name === "pick") renderPickView();
   if (name === "me") renderMeView();
+  if (name === "meals") renderMeals();
 }
 
 // ============================================
@@ -132,7 +143,8 @@ function renderHome() {
   document.getElementById("quick-sub").textContent =
     n > 0 ? "从 " + n + " 道菜里帮你选一道" : "还没有菜品，先去菜单添加吧";
 
-  // 好好吃饭打卡
+  // 今日饭记摘要 + 好好吃饭打卡
+  renderTodayMeals();
   renderCheckin();
 
   // 时令推荐：按当前月份过滤内置库
@@ -301,6 +313,189 @@ function renderCheckin() {
       }).join("") +
     "</div>";
   document.getElementById("checkin-cal").innerHTML = html;
+}
+
+// ============================================
+// 饭记（记录在家做的每一顿饭）
+// ============================================
+
+// 首页「今日饭记」摘要卡
+function renderTodayMeals() {
+  var todayDs = toDateKey(new Date());
+  var list = mealsByDate(todayDs); // 已按 餐次→创建时间 排序
+  document.getElementById("today-meals-count").textContent = list.length + " 顿";
+  var box = document.getElementById("today-meals-latest");
+  var latest = list[list.length - 1];
+  if (latest) {
+    var names = (latest.dishIds || []).map(function (id) {
+      var d = getDish(id);
+      return d ? d.name : "";
+    }).filter(Boolean).slice(0, 3).join("、");
+    box.innerHTML =
+      '<span class="badge">' + escapeHtml(latest.mealType) + "</span>" +
+      '<span class="today-meals-latest-text">' +
+      (names ? escapeHtml(names) : "只拍了张照片") + "</span>";
+  } else {
+    box.innerHTML = '<span class="hint">今天还没记录，做完饭来记一笔，会自动打卡</span>';
+  }
+}
+
+// 饭记时间线：按日分组渲染
+function renderMeals() {
+  var meals = getMeals();
+  var tl = document.getElementById("meals-timeline");
+  var empty = document.getElementById("meals-empty");
+  if (meals.length === 0) {
+    tl.innerHTML = "";
+    empty.classList.remove("hidden");
+    empty.innerHTML = '<div class="empty-icon">🍚</div><p>还没有饭记<br>记录下今天做的一顿饭吧</p>';
+    return;
+  }
+  empty.classList.add("hidden");
+  var todayDs = toDateKey(new Date());
+  tl.innerHTML = groupMealsByDate(meals).map(function (g) {
+    return '<div class="section-label meal-day">' + escapeHtml(formatDayHeader(g.date, todayDs)) + "</div>" +
+      g.meals.map(mealCardHTML).join("");
+  }).join("");
+}
+
+// 单条饭记卡片。图：饭记照片 → 第一道存在菜品的图 → 无图块
+function mealCardHTML(m) {
+  var img = "";
+  if (m.image) {
+    img = '<div class="meal-img"><img src="' + m.image + '" alt="饭记照片" loading="lazy"></div>';
+  } else {
+    var first = null;
+    (m.dishIds || []).some(function (id) {
+      var d = getDish(id);
+      if (d && d.image) { first = d; return true; }
+      return false;
+    });
+    if (first) {
+      img = '<div class="meal-img"><img src="' + first.image + '" alt="' + escapeHtml(first.name) + '" loading="lazy"' +
+        ' data-emoji="' + escapeHtml(first.emoji || "") + '"' +
+        ' data-colors="' + escapeHtml((first.colors || []).join(",")) + '"></div>';
+    }
+  }
+  var chips = (m.dishIds || []).map(function (id) {
+    var d = getDish(id);
+    if (!d) return "";
+    return '<button type="button" class="chip meal-chip" data-action="meal-dish" data-id="' + d.id + '">' +
+      escapeHtml(d.name) + "</button>";
+  }).join("");
+  var t = m.createdAt ? new Date(m.createdAt) : null;
+  var time = t ? pad2(t.getHours()) + ":" + pad2(t.getMinutes()) : "";
+  return (
+    '<div class="card meal-card" id="meal-' + m.id + '" data-action="meal-edit" data-id="' + m.id + '">' +
+      '<div class="meal-head">' +
+        '<span class="badge">' + escapeHtml(m.mealType) + "</span>" +
+        '<span class="meal-time">' + time + "</span>" +
+        '<button type="button" class="btn btn-small" data-action="meal-edit" data-id="' + m.id + '">编辑</button>' +
+      "</div>" +
+      img +
+      (chips ? '<div class="meal-chips">' + chips + "</div>" : "") +
+      (m.note ? '<p class="meal-note">' + escapeHtml(m.note) + "</p>" : "") +
+    "</div>"
+  );
+}
+
+// 打开饭记表单：id 为空 = 新增；有 id = 编辑（预填数据）
+function openMealForm(id) {
+  state.editingMealId = id || null;
+  var m = id ? getMeal(id) : null;
+  var now = new Date();
+
+  // 打开时固化日期与默认餐次（记录的是「那顿饭」的日期，不是保存时刻）
+  state.mealFormImage = m ? (m.image || "") : "";
+  state.mealFormDishIds = m ? (m.dishIds || []).slice() : [];
+  state.mealFormType = m ? m.mealType : defaultMealType(now.getHours());
+  state.mealFormDate = m ? m.date : toDateKey(now);
+  state.mealFormNote = m ? (m.note || "") : "";
+
+  document.getElementById("meal-form-title").textContent = m ? "编辑饭记" : "记录这顿饭";
+  document.getElementById("mf-date").value = state.mealFormDate;
+  document.getElementById("mf-date").max = toDateKey(now); // 日期选择器层面禁未来
+  document.getElementById("mf-note").value = state.mealFormNote;
+  document.getElementById("mf-dish-search").value = "";
+  document.getElementById("mf-btn-delete").hidden = !m;
+
+  renderMealTypeSeg();
+  renderMealImageBox();
+  renderMealDishList();
+  updateMealDishCount();
+  showView("meal-form");
+}
+
+function renderMealTypeSeg() {
+  document.querySelectorAll("#mf-meal-type .meal-seg-btn").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.type === state.mealFormType);
+  });
+}
+
+function renderMealImageBox() {
+  var box = document.getElementById("mf-image-preview-box");
+  if (state.mealFormImage) {
+    document.getElementById("mf-image-preview").src = state.mealFormImage;
+    box.classList.remove("hidden");
+  } else {
+    document.getElementById("mf-image-preview").removeAttribute("src");
+    box.classList.add("hidden");
+  }
+}
+
+// 菜谱多选列表（复用 filterDishes 做搜索过滤）
+function renderMealDishList() {
+  var q = (document.getElementById("mf-dish-search").value || "").trim();
+  var box = document.getElementById("mf-dish-list");
+  if (getDishes().length === 0) {
+    box.innerHTML = '<p class="hint" style="padding:12px 14px">还没有菜品：先去「菜单」页添加，饭记没有菜也能保存</p>';
+    return;
+  }
+  var list = filterDishes(q, "全部");
+  if (list.length === 0) {
+    box.innerHTML = '<p class="hint" style="padding:12px 14px">没有匹配的菜</p>';
+    return;
+  }
+  box.innerHTML = list.map(function (d) {
+    var checked = state.mealFormDishIds.indexOf(d.id) !== -1;
+    return '<label class="meal-dish-row">' +
+      '<input type="checkbox" data-dish-id="' + d.id + '"' + (checked ? " checked" : "") + ">" +
+      '<span class="meal-dish-name">' + escapeHtml(d.name) + "</span>" +
+      '<span class="badge">' + escapeHtml(d.category || "未分类") + "</span>" +
+    "</label>";
+  }).join("");
+}
+
+function updateMealDishCount() {
+  document.getElementById("mf-dish-count").textContent = state.mealFormDishIds.length;
+}
+
+// 保存饭记
+async function saveMealForm(e) {
+  e.preventDefault();
+  var date = document.getElementById("mf-date").value;
+  if (!isValidDateKey(date)) { alert("请选择日期"); return; }
+  if (date > toDateKey(new Date())) { alert("日期不能是未来"); return; } // JS 层双保险
+  var note = document.getElementById("mf-note").value.trim();
+  if (note.length > 200) { alert("感想最多 200 字"); return; }
+
+  var payload = {
+    date: date,
+    mealType: state.mealFormType,
+    dishIds: state.mealFormDishIds.filter(function (id) { return getDish(id); }), // 过滤已删菜
+    note: note,
+    image: state.mealFormImage
+  };
+  var ok = state.editingMealId
+    ? await updateMeal(state.editingMealId, payload)
+    : await addMeal(payload); // addMeal 会在 payload 上补 id
+  if (!ok) return; // 空间不足等：留在表单，内容不丢
+
+  var targetId = state.editingMealId || payload.id;
+  state.editingMealId = null;
+  showView("meals");
+  var el = document.getElementById("meal-" + targetId);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // 渲染一排分类 chips（列表页和抽签页共用）
@@ -669,7 +864,7 @@ function renderPickResult() {
     : "";
   var div = document.getElementById("pick-result");
   div.innerHTML =
-    '<div class="result-card">' +
+    '<div class="card result-card">' +
       img +
       "<h3>" + escapeHtml(d.name) + "</h3>" +
       '<div class="detail-meta" style="justify-content:center">' +
@@ -793,6 +988,15 @@ function handleImportFile(file) {
       (data.categories || []).forEach(function (c) {
         addCategoryToData(cur, c);
       });
+      // 饭记按 id 去重合并；打卡键合并
+      cur.meals = Array.isArray(cur.meals) ? cur.meals : [];
+      var mealIds = new Set(cur.meals.map(function (m) { return m.id; }));
+      (Array.isArray(data.meals) ? data.meals : []).forEach(function (m) {
+        if (m && !mealIds.has(m.id)) cur.meals.push(m);
+      });
+      if (!cur.checkins || typeof cur.checkins !== "object") cur.checkins = {};
+      var srcCheckins = (data.checkins && typeof data.checkins === "object") ? data.checkins : {};
+      Object.keys(srcCheckins).forEach(function (k) { cur.checkins[k] = true; });
       ok = await saveData();
       if (ok) {
         alert("导入完成：新增 " + (data.dishes.length - skipped) + " 道菜品" + (skipped ? "，跳过 " + skipped + " 道重复" : ""));
@@ -802,7 +1006,11 @@ function handleImportFile(file) {
         var restored = {
           version: data.version || 1,
           categories: (data.categories && data.categories.length) ? data.categories : defaultData().categories,
-          dishes: data.dishes
+          dishes: data.dishes,
+          // 旧备份可能没有这两个字段：补空，防止覆盖后丢失现有功能
+          checkins: (data.checkins && typeof data.checkins === "object" && !Array.isArray(data.checkins))
+            ? data.checkins : {},
+          meals: Array.isArray(data.meals) ? data.meals : []
         };
         // 打上示例注入标记：防止导入旧备份后示例菜复活
         if (typeof SAMPLE_DISHES_VERSION !== "undefined") {
@@ -826,7 +1034,8 @@ function init() {
   // 版本检查：核心元素缺失说明 HTML/JS 版本不一致（自动刷新也没救回来）
   if (!document.getElementById("view-home") ||
       !document.getElementById("quick-pick-card") ||
-      !document.getElementById("checkin")) {
+      !document.getElementById("checkin") ||
+      !document.getElementById("view-meals")) {
     alert("页面缓存版本不一致。\n请再刷新一两次；若仍不行，请清除该网站的浏览器缓存数据后重试。");
     return;
   }
@@ -857,6 +1066,78 @@ function bindAllEvents() {
   // 首页快捷卡 → 抽签页
   document.getElementById("quick-pick-card").addEventListener("click", function () {
     showView("pick");
+  });
+
+  // 首页今日饭记卡 → 记录表单
+  document.getElementById("btn-record-meal").addEventListener("click", function () {
+    openMealForm(null);
+  });
+
+  // ---- 饭记时间线 ----
+  document.getElementById("btn-new-meal").addEventListener("click", function () {
+    openMealForm(null);
+  });
+  document.getElementById("meals-timeline").addEventListener("click", function (e) {
+    var chip = e.target.closest("[data-action='meal-dish']"); // 先判菜名 chip，避免落进卡片编辑
+    if (chip) {
+      state.detailBack = "meals";
+      state.currentId = chip.dataset.id;
+      showView("detail");
+      return;
+    }
+    var card = e.target.closest("[data-action='meal-edit']");
+    if (card) openMealForm(card.dataset.id);
+  });
+
+  // ---- 饭记表单 ----
+  document.getElementById("meal-form").addEventListener("submit", saveMealForm);
+  document.getElementById("mf-btn-cancel").addEventListener("click", function () {
+    state.editingMealId = null;
+    showView("meals");
+  });
+  document.getElementById("mf-btn-delete").addEventListener("click", async function () {
+    if (!state.editingMealId) return;
+    if (!confirm("确定删除这条饭记吗？删除后无法恢复（当天的打卡会保留）")) return;
+    await deleteMeal(state.editingMealId);
+    state.editingMealId = null;
+    showView("meals");
+  });
+  // 餐次分段控件
+  document.getElementById("mf-meal-type").addEventListener("click", function (e) {
+    var b = e.target.closest(".meal-seg-btn");
+    if (b) { state.mealFormType = b.dataset.type; renderMealTypeSeg(); }
+  });
+  // 照片（与菜品表单同款流程，失败留空仍可保存）
+  var mfImageInput = document.getElementById("mf-image");
+  document.getElementById("mf-btn-pick-image").addEventListener("click", function () {
+    mfImageInput.click();
+  });
+  mfImageInput.addEventListener("change", function () {
+    var file = mfImageInput.files[0];
+    if (!file) return;
+    if (file.type.indexOf("image/") !== 0) { alert("请选择图片文件"); return; }
+    compressImage(file).then(function (dataUrl) {
+      state.mealFormImage = dataUrl;
+      renderMealImageBox();
+    }).catch(function () {
+      alert("图片处理失败，请换一张试试");
+    });
+    mfImageInput.value = "";
+  });
+  document.getElementById("mf-btn-remove-image").addEventListener("click", function () {
+    state.mealFormImage = "";
+    renderMealImageBox();
+  });
+  // 菜多选：搜索过滤 + 勾选切换
+  document.getElementById("mf-dish-search").addEventListener("input", renderMealDishList);
+  document.getElementById("mf-dish-list").addEventListener("change", function (e) {
+    var cb = e.target.closest("[data-dish-id]");
+    if (!cb) return;
+    var id = cb.dataset.dishId;
+    var i = state.mealFormDishIds.indexOf(id);
+    if (cb.checked && i === -1) state.mealFormDishIds.push(id);
+    if (!cb.checked && i !== -1) state.mealFormDishIds.splice(i, 1);
+    updateMealDishCount();
   });
 
   // ---- 好好吃饭打卡 ----
@@ -895,13 +1176,16 @@ function bindAllEvents() {
   document.getElementById("dish-grid").addEventListener("click", function (e) {
     var card = e.target.closest("[data-action='open-detail']");
     if (card) {
+      state.detailBack = "list";
       state.currentId = card.dataset.id;
       showView("detail");
     }
   });
 
   // ---- 详情页 ----
-  document.getElementById("btn-back").addEventListener("click", function () { showView("list"); });
+  document.getElementById("btn-back").addEventListener("click", function () {
+    showView(state.detailBack || "list");
+  });
   document.getElementById("btn-edit").addEventListener("click", function () { openForm(state.currentId); });
   document.getElementById("btn-delete").addEventListener("click", async function () {
     var d = getDish(state.currentId);
@@ -1034,6 +1318,7 @@ function bindAllEvents() {
   document.getElementById("pick-result").addEventListener("click", function (e) {
     var detailBtn = e.target.closest("[data-action='pick-detail']");
     if (detailBtn) {
+      state.detailBack = "pick";
       state.currentId = state.lastPick.id;
       showView("detail");
       return;

@@ -66,3 +66,61 @@ function computeStreak(checkins, todayDs) {
   }
   return n;
 }
+
+// ============================================
+// 饭记时间线的纯逻辑（无 DOM，便于测试）
+// ============================================
+
+var MEAL_TYPE_ORDER = ["早餐", "午餐", "晚餐", "加餐"];
+var WEEKDAYS_CN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+// 餐次排序权重（非法餐次排最后）
+function mealTypeRank(t) {
+  var i = MEAL_TYPE_ORDER.indexOf(t);
+  return i === -1 ? 99 : i;
+}
+
+// 按当前小时给默认餐次
+function defaultMealType(h) {
+  if (h < 10) return "早餐";
+  if (h < 14) return "午餐";
+  if (h < 17) return "加餐";
+  if (h < 21) return "晚餐";
+  return "加餐";
+}
+
+// 排序（返回新数组，不改变原顺序）：
+// 日期降序（最新一天在前）→ 同天内餐次升序（早→晚，时间正序阅读）→ createdAt 升序
+function sortMeals(meals) {
+  return (meals || []).slice().sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    var ra = mealTypeRank(a.mealType);
+    var rb = mealTypeRank(b.mealType);
+    if (ra !== rb) return ra - rb;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+// 按日期分组：[{ date, meals:[...] }]，日期降序
+function groupMealsByDate(meals) {
+  var groups = [];
+  sortMeals(meals).forEach(function (m) {
+    var last = groups[groups.length - 1];
+    if (!last || last.date !== m.date) {
+      groups.push({ date: m.date, meals: [m] });
+    } else {
+      last.meals.push(m);
+    }
+  });
+  return groups;
+}
+
+// 日期头文案：今天 / 昨天 / M月D日 周X（跨年补 YYYY年）
+function formatDayHeader(ds, todayDs) {
+  if (ds === todayDs) return "今天";
+  if (ds === dateKeyAddDays(todayDs, -1)) return "昨天";
+  var p = parseDateKey(ds);
+  var wd = WEEKDAYS_CN[new Date(p.y, p.m - 1, p.d).getDay()];
+  var yearPart = (p.y === new Date().getFullYear()) ? "" : p.y + "年";
+  return yearPart + p.m + "月" + p.d + "日 " + wd;
+}

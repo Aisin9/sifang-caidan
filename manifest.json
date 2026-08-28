@@ -1,7 +1,7 @@
 {
   "name": "私房菜单",
   "short_name": "私房菜单",
-  "description": "记录私房菜谱，解决今天吃什么",
+  "description": "记录在家做的每一顿饭",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",

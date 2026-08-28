@@ -28,10 +28,11 @@ var useIDB = false; // 当前用的是 IndexedDB 还是 localStorage
 // ---- 默认数据结构（第一次使用时初始化）----
 function defaultData() {
   return {
-    version: 3,
+    version: 4,
     categories: ["荤菜", "素菜", "汤羹", "主食", "快手菜"],
     dishes: [],
-    checkins: {}   // 「好好吃饭」打卡记录：{ "2026-08-27": true }
+    checkins: {},  // 「好好吃饭」打卡记录：{ "2026-08-27": true }
+    meals: []      // 饭记：{ id, date, mealType, dishIds, note, image, createdAt, updatedAt }
   };
 }
 
@@ -160,11 +161,25 @@ function initStore() {
       }
     }
 
-    // 5. 存量迁移：补 checkins 字段 + 老用户库中的 SVG 占位图换成内置照片
+    // 5. 存量迁移：补 checkins/meals 字段 + 老用户库中的 SVG 占位图换成内置照片
     var changed = false;
     if (!cache.checkins || typeof cache.checkins !== "object" || Array.isArray(cache.checkins)) {
       cache.checkins = {};
       changed = true;
+    }
+    if (!Array.isArray(cache.meals)) {
+      cache.meals = [];
+      changed = true;
+    } else {
+      // 逐条校验：date 非法的饭记丢弃（避免旧数据污染时间线）
+      var kept = cache.meals.filter(function (m) {
+        return m && isValidDateKey(m.date);
+      });
+      if (kept.length !== cache.meals.length) {
+        cache.meals = kept;
+        changed = true;
+      }
+      kept.forEach(fillMealDefaults);
     }
     if (typeof SAMPLE_DISHES !== "undefined") {
       var photoMap = {};
@@ -343,6 +358,7 @@ function isChecked(ds) {
 }
 
 // 切换某天的打卡状态（ds 格式 "YYYY-MM-DD"），返回 Promise<boolean>
+// 这是唯一能「取消」打卡的入口；饭记的自动打卡只增不删
 function toggleCheckin(ds) {
   var data = getData();
   if (!data.checkins || typeof data.checkins !== "object") data.checkins = {};
@@ -351,6 +367,87 @@ function toggleCheckin(ds) {
   } else {
     data.checkins[ds] = true;
   }
+  return saveData();
+}
+
+// ============================================
+// 饭记（记录在家做的每一顿饭）
+// ============================================
+
+var MEAL_TYPES = ["早餐", "午餐", "晚餐", "加餐"];
+
+// 防止漏存字段 + 非法餐次归一为「晚餐」
+function fillMealDefaults(m) {
+  if (MEAL_TYPES.indexOf(m.mealType) === -1) m.mealType = "晚餐";
+  m.dishIds = Array.isArray(m.dishIds) ? m.dishIds : [];
+  m.note = typeof m.note === "string" ? m.note : "";
+  m.image = typeof m.image === "string" ? m.image : "";
+}
+
+// 定长零填充的日期键，字符串比较即日期比较
+function isValidDateKey(s) {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function getMeals() {
+  return getData().meals || [];
+}
+
+function getMeal(id) {
+  return getMeals().find(function (m) { return m.id === id; }) || null;
+}
+
+// 某一天的全部饭记（按 餐次→创建时间 排序，sortMeals 在 checkin.js）
+function mealsByDate(ds) {
+  return (typeof sortMeals === "function" ? sortMeals : function (a) { return a; })(
+    getMeals().filter(function (m) { return m.date === ds; })
+  );
+}
+
+// 新增饭记：补 id/时间戳 + 自动打卡（同一次 saveData 原子落盘）。
+// 注意：自动打卡直接置 true，绝不能用 toggleCheckin（已打卡时它会删掉打卡）。
+function addMeal(meal) {
+  if (!meal || !isValidDateKey(meal.date)) return Promise.resolve(false);
+  meal.id = uid();
+  meal.createdAt = Date.now();
+  meal.updatedAt = meal.createdAt;
+  fillMealDefaults(meal);
+  var data = getData();
+  data.meals.push(meal);
+  if (!data.checkins || typeof data.checkins !== "object" || Array.isArray(data.checkins)) {
+    data.checkins = {};
+  }
+  data.checkins[meal.date] = true;
+  return saveData(); // 两处内存变更 + 一次落盘 = 天然原子
+}
+
+// 更新饭记：键白名单合并，防止 patch 覆盖 id/createdAt；
+// 改日期时新日期打卡（旧日期打卡保留——手动/自动来源不可区分，统一不撤）
+function updateMeal(id, patch) {
+  var meal = getMeal(id);
+  if (!meal) return Promise.resolve(false);
+  patch = patch || {};
+  if (patch.date !== undefined && !isValidDateKey(patch.date)) return Promise.resolve(false);
+  var oldDate = meal.date;
+  ["date", "mealType", "dishIds", "note", "image"].forEach(function (k) {
+    if (patch[k] !== undefined) meal[k] = patch[k];
+  });
+  fillMealDefaults(meal);
+  meal.updatedAt = Date.now();
+  if (meal.date !== oldDate) {
+    var data = getData();
+    if (!data.checkins || typeof data.checkins !== "object" || Array.isArray(data.checkins)) {
+      data.checkins = {};
+    }
+    data.checkins[meal.date] = true;
+  }
+  return saveData();
+}
+
+// 删除饭记：不撤销当天的打卡（打卡可能来自手动或其他饭记）
+function deleteMeal(id) {
+  var data = getData();
+  data.meals = data.meals.filter(function (m) { return m.id !== id; });
   return saveData();
 }
 
